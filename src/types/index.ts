@@ -215,6 +215,8 @@ export interface Document {
   extractedText?: string;
   size: number;
   mimeType: string;
+  fileData?: string; // Base64 encoded file data for storage
+  textFileId?: string; // Reference to companion text file
 }
 
 // Status History Entry

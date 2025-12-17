@@ -1,7 +1,7 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import type { User, Case, Hospital, Notification } from '@/types';
 
-interface MedCoordDB extends DBSchema {
+interface SudIndDB extends DBSchema {
   users: {
     key: string;
     value: User;
@@ -27,15 +27,15 @@ interface MedCoordDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'medcoord-db';
+const DB_NAME = 'sudind-db';
 const DB_VERSION = 1;
 
-let dbInstance: IDBPDatabase<MedCoordDB> | null = null;
+let dbInstance: IDBPDatabase<SudIndDB> | null = null;
 
-export const initDB = async (): Promise<IDBPDatabase<MedCoordDB>> => {
+export const initDB = async (): Promise<IDBPDatabase<SudIndDB>> => {
   if (dbInstance) return dbInstance;
 
-  dbInstance = await openDB<MedCoordDB>(DB_NAME, DB_VERSION, {
+  dbInstance = await openDB<SudIndDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {
       // Users store
       if (!db.objectStoreNames.contains('users')) {
@@ -87,7 +87,19 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
 
 export const getUserByUsername = async (username: string): Promise<User | undefined> => {
   const db = await initDB();
-  return db.getFromIndex('users', 'by-username', username);
+  // Normalize username to lowercase for case-insensitive lookup
+  const normalizedUsername = username.toLowerCase().trim();
+  
+  // Try exact match first (for normalized usernames)
+  let user = await db.getFromIndex('users', 'by-username', normalizedUsername);
+  
+  // If not found, try to find by iterating (for backward compatibility with old usernames)
+  if (!user) {
+    const allUsers = await db.getAll('users');
+    user = allUsers.find(u => u.username.toLowerCase().trim() === normalizedUsername);
+  }
+  
+  return user;
 };
 
 export const getUsersByRole = async (role: string): Promise<User[]> => {
@@ -175,6 +187,11 @@ export const addHospital = async (hospital: Hospital): Promise<void> => {
 export const updateHospital = async (hospital: Hospital): Promise<void> => {
   const db = await initDB();
   await db.put('hospitals', hospital);
+};
+
+export const deleteHospital = async (id: string): Promise<void> => {
+  const db = await initDB();
+  await db.delete('hospitals', id);
 };
 
 // Notifications operations

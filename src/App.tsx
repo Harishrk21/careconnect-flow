@@ -11,19 +11,39 @@ import Dashboard from "./pages/Dashboard";
 import CasesList from "./pages/cases/CasesList";
 import CaseDetail from "./pages/cases/CaseDetail";
 import CreateCase from "./pages/cases/CreateCase";
+import ClientsList from "./pages/clients/ClientsList";
+import CreateClient from "./pages/clients/CreateClient";
+import UserManagement from "./pages/UserManagement";
+import HospitalManagement from "./pages/HospitalManagement";
+import Documents from "./pages/Documents";
+import Payments from "./pages/Payments";
+import Notifications from "./pages/Notifications";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-pulse-soft text-muted-foreground">Loading...</div></div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // Don't redirect here - let Login page handle password change requirement
+  // This prevents infinite loops
   return <>{children}</>;
 };
 
 const AppRoutes: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  // Show loading while auth is initializing
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse-soft text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+  
   return (
     <Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
@@ -33,12 +53,14 @@ const AppRoutes: React.FC = () => {
         <Route path="cases" element={<CasesList />} />
         <Route path="cases/new" element={<CreateCase />} />
         <Route path="cases/:id" element={<CaseDetail />} />
-        <Route path="users" element={<Dashboard />} />
-        <Route path="hospitals" element={<Dashboard />} />
-        <Route path="documents" element={<Dashboard />} />
-        <Route path="payments" element={<Dashboard />} />
-        <Route path="notifications" element={<Dashboard />} />
-        <Route path="settings" element={<Dashboard />} />
+        <Route path="clients" element={<ClientsList />} />
+        <Route path="clients/new" element={<CreateClient />} />
+        <Route path="users" element={<UserManagement />} />
+        <Route path="hospitals" element={<HospitalManagement />} />
+        <Route path="documents" element={<Documents />} />
+        <Route path="payments" element={<Payments />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -64,6 +64,12 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
     },
     {
       icon: Users,
+      label: 'Clients',
+      href: '/clients',
+      roles: ['admin', 'agent'],
+    },
+    {
+      icon: Users,
       label: 'User Management',
       href: '/users',
       roles: ['admin'],
@@ -113,13 +119,21 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       {/* Header */}
       <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-9 h-9 bg-sidebar-primary rounded-lg flex items-center justify-center flex-shrink-0">
-            <Heart className="w-5 h-5 text-sidebar-primary-foreground" />
-          </div>
-          {!collapsed && (
-            <div className="animate-fade-in">
-              <h1 className="font-display font-bold text-sidebar-primary text-sm">MedCoord</h1>
-              <p className="text-xs text-sidebar-foreground/70">Platform</p>
+          {collapsed ? (
+            <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
+              <img 
+                src="/logo.png" 
+                alt="SudInd" 
+                className="h-8 w-auto"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 animate-fade-in">
+              <img 
+                src="/logo.png" 
+                alt="SudInd" 
+                className="h-10 w-auto"
+              />
             </div>
           )}
         </div>

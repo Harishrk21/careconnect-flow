@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,14 +8,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const CreateCase: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { createCase, createUser } = useData();
+  const { createCase, createUser, users } = useData();
   const [loading, setLoading] = useState(false);
+  const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+
+  // Check if clientId is provided in URL
+  useEffect(() => {
+    const clientIdParam = searchParams.get('clientId');
+    if (clientIdParam) {
+      setSelectedClientId(clientIdParam);
+      setClientMode('existing');
+    }
+  }, [searchParams]);
   const [formData, setFormData] = useState({
     patientName: '', dob: '', passport: '', nationality: 'Sudanese',
     condition: '', phone: '', email: '', address: '',
@@ -24,39 +36,109 @@ const CreateCase: React.FC = () => {
     attenderPhone: '', attenderEmail: '',
   });
 
+  // Get all clients
+  const clients = useMemo(() => {
+    return users.filter(u => u.role === 'client');
+  }, [users]);
+
+  // Get selected client data
+  const selectedClient = useMemo(() => {
+    if (!selectedClientId) return null;
+    return clients.find(c => c.id === selectedClientId);
+  }, [selectedClientId, clients]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.patientName || !formData.condition) {
-      toast({ title: 'Error', description: 'Please fill required fields', variant: 'destructive' });
+    if (!formData.condition) {
+      toast({ title: 'Error', description: 'Medical condition is required', variant: 'destructive' });
       return;
     }
+
+    if (clientMode === 'existing' && !selectedClientId) {
+      toast({ title: 'Error', description: 'Please select a client', variant: 'destructive' });
+      return;
+    }
+
+    if (clientMode === 'new' && !formData.patientName) {
+      toast({ title: 'Error', description: 'Patient name is required', variant: 'destructive' });
+      return;
+    }
+
     setLoading(true);
     try {
-      const client = await createUser({
-        username: `client.${formData.patientName.toLowerCase().replace(/\s+/g, '.')}`,
-        password: btoa('client123'), role: 'client', name: formData.patientName,
-        email: formData.email || 'patient@email.com', phone: formData.phone,
-        passwordChanged: false, createdBy: user?.id || '', createdAt: new Date().toISOString(), lastLogin: '',
-      });
+      let clientId: string;
+      let clientInfo;
+
+      if (clientMode === 'existing' && selectedClient) {
+        clientId = selectedClient.id;
+        clientInfo = {
+          name: selectedClient.name,
+          dob: formData.dob || '',
+          passport: formData.passport || '',
+          nationality: formData.nationality || 'Sudanese',
+          condition: formData.condition,
+          phone: selectedClient.phone || formData.phone,
+          email: selectedClient.email || formData.email,
+          address: formData.address || '',
+          emergencyContact: formData.emergencyContact || '',
+          emergencyPhone: formData.emergencyPhone || '',
+        };
+      } else {
+        // Create new client
+        // Normalize username to lowercase and ensure consistent format
+        const normalizedUsername = `client.${formData.patientName.toLowerCase().trim().replace(/\s+/g, '.')}`;
+        const defaultPassword = 'client123';
+        
+        const client = await createUser({
+          username: normalizedUsername,
+          password: btoa(defaultPassword), 
+          role: 'client', 
+          name: formData.patientName,
+          email: formData.email || 'patient@email.com', 
+          phone: formData.phone,
+          passwordChanged: false, 
+          createdBy: user?.id || '', 
+          createdAt: new Date().toISOString(), 
+          lastLogin: '',
+        });
+        clientId = client.id;
+        clientInfo = {
+          name: formData.patientName, 
+          dob: formData.dob, 
+          passport: formData.passport,
+          nationality: formData.nationality, 
+          condition: formData.condition,
+          phone: formData.phone, 
+          email: formData.email, 
+          address: formData.address,
+          emergencyContact: formData.emergencyContact, 
+          emergencyPhone: formData.emergencyPhone,
+        };
+      }
+
       await createCase({
-        clientId: client.id,
-        clientInfo: {
-          name: formData.patientName, dob: formData.dob, passport: formData.passport,
-          nationality: formData.nationality, condition: formData.condition,
-          phone: formData.phone, email: formData.email, address: formData.address,
-          emergencyContact: formData.emergencyContact, emergencyPhone: formData.emergencyPhone,
-        },
+        clientId,
+        clientInfo,
         attenderInfo: formData.attenderName ? {
-          name: formData.attenderName, relationship: formData.attenderRelationship,
-          passport: formData.attenderPassport, phone: formData.attenderPhone, email: formData.attenderEmail,
+          name: formData.attenderName, 
+          relationship: formData.attenderRelationship,
+          passport: formData.attenderPassport, 
+          phone: formData.attenderPhone, 
+          email: formData.attenderEmail,
         } : undefined,
         priority: formData.priority as 'low' | 'medium' | 'high' | 'urgent',
       });
-      toast({ title: 'Success', description: 'Case created successfully' });
+      
+      toast({ 
+        title: 'Success', 
+        description: `Case created successfully${clientMode === 'new' ? ` for ${formData.patientName}` : ''}` 
+      });
       navigate('/cases');
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to create case', variant: 'destructive' });
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const updateField = (field: string, value: string) => setFormData(prev => ({ ...prev, [field]: value }));
@@ -67,21 +149,114 @@ const CreateCase: React.FC = () => {
         <Button variant="ghost" size="icon" onClick={() => navigate('/cases')}><ArrowLeft className="w-5 h-5" /></Button>
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">Create New Case</h1>
-          <p className="text-muted-foreground">Enter patient details to create a new case</p>
+          <p className="text-muted-foreground">Select an existing client or create a new one, then enter case details</p>
         </div>
       </div>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Client Selection */}
         <Card className="card-elevated">
-          <CardHeader><CardTitle className="text-foreground">Patient Information</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-foreground">Client Selection</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant={clientMode === 'existing' ? 'default' : 'outline'}
+                onClick={() => setClientMode('existing')}
+                className={clientMode === 'existing' ? 'bg-gradient-primary' : ''}
+              >
+                Select Existing Client
+              </Button>
+              <Button
+                type="button"
+                variant={clientMode === 'new' ? 'default' : 'outline'}
+                onClick={() => setClientMode('new')}
+                className={clientMode === 'new' ? 'bg-gradient-primary' : ''}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create New Client
+              </Button>
+            </div>
+
+            {clientMode === 'existing' ? (
+              <div className="space-y-2">
+                <Label>Select Client *</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a client..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border max-h-[300px]">
+                    {clients.length > 0 ? (
+                      clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name} {client.email ? `(${client.email})` : ''}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="none" disabled>
+                        No clients found
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {clients.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No clients available. <Link to="/clients/new" className="text-primary hover:underline">Create a new client</Link>
+                  </p>
+                )}
+                {selectedClient && (
+                  <div className="p-3 bg-muted/30 rounded-lg mt-2">
+                    <p className="text-sm font-medium text-foreground">{selectedClient.name}</p>
+                    {selectedClient.email && <p className="text-xs text-muted-foreground">{selectedClient.email}</p>}
+                    {selectedClient.phone && <p className="text-xs text-muted-foreground">{selectedClient.phone}</p>}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Client Name *</Label>
+                <Input 
+                  value={formData.patientName} 
+                  onChange={e => updateField('patientName', e.target.value)} 
+                  required 
+                  placeholder="Enter patient full name"
+                />
+                <p className="text-xs text-muted-foreground">
+                  A new client account will be created for this patient
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="card-elevated">
+          <CardHeader><CardTitle className="text-foreground">Case Information</CardTitle></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label>Full Name *</Label><Input value={formData.patientName} onChange={e => updateField('patientName', e.target.value)} required /></div>
+            {clientMode === 'new' && (
+              <>
+                <div className="space-y-2"><Label>Full Name *</Label><Input value={formData.patientName} onChange={e => updateField('patientName', e.target.value)} required /></div>
+              </>
+            )}
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={formData.dob} onChange={e => updateField('dob', e.target.value)} /></div>
             <div className="space-y-2"><Label>Passport Number</Label><Input value={formData.passport} onChange={e => updateField('passport', e.target.value)} /></div>
             <div className="space-y-2"><Label>Nationality</Label><Input value={formData.nationality} onChange={e => updateField('nationality', e.target.value)} /></div>
-            <div className="md:col-span-2 space-y-2"><Label>Medical Condition *</Label><Textarea value={formData.condition} onChange={e => updateField('condition', e.target.value)} required /></div>
-            <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={e => updateField('phone', e.target.value)} /></div>
-            <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => updateField('email', e.target.value)} /></div>
-            <div className="md:col-span-2 space-y-2"><Label>Address</Label><Input value={formData.address} onChange={e => updateField('address', e.target.value)} /></div>
+            <div className="md:col-span-2 space-y-2">
+              <Label>Medical Condition *</Label>
+              <Textarea 
+                value={formData.condition} 
+                onChange={e => updateField('condition', e.target.value)} 
+                required 
+                placeholder="Describe the medical condition requiring treatment"
+              />
+            </div>
+            {clientMode === 'new' && (
+              <>
+                <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={e => updateField('phone', e.target.value)} /></div>
+                <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => updateField('email', e.target.value)} /></div>
+                <div className="md:col-span-2 space-y-2"><Label>Address</Label><Input value={formData.address} onChange={e => updateField('address', e.target.value)} /></div>
+              </>
+            )}
             <div className="space-y-2"><Label>Priority</Label>
               <Select value={formData.priority} onValueChange={v => updateField('priority', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>

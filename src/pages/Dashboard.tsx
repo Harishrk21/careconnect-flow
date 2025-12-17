@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { STATUS_LABELS, STATUS_COLORS } from '@/types';
+import ClientDashboard from './dashboards/ClientDashboard';
+import HospitalDashboard from './dashboards/HospitalDashboard';
+import FinanceDashboard from './dashboards/FinanceDashboard';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -88,6 +91,20 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  // Route to role-specific dashboard
+  if (user?.role === 'client') {
+    return <ClientDashboard />;
+  }
+  
+  if (user?.role === 'hospital') {
+    return <HospitalDashboard />;
+  }
+  
+  if (user?.role === 'finance') {
+    return <FinanceDashboard />;
+  }
+
+  // Generic dashboard for other roles (will be replaced with role-specific dashboards)
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}

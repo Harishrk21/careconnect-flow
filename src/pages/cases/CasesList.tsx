@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +36,7 @@ import { STATUS_LABELS, STATUS_COLORS, type CaseStatus } from '@/types';
 import { cn } from '@/lib/utils';
 
 const CasesList: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { cases, hospitals, isLoading } = useData();
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,7 +131,7 @@ const CasesList: React.FC = () => {
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Cases</h1>
           <p className="text-muted-foreground mt-1">
-            Manage and track all medical coordination cases
+            Manage and track all SudInd cases
           </p>
         </div>
         {(user?.role === 'agent' || user?.role === 'admin') && (
@@ -240,7 +241,8 @@ const CasesList: React.FC = () => {
                     return (
                       <TableRow 
                         key={caseItem.id} 
-                        className="border-border hover:bg-muted/50 transition-colors"
+                        className="border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/cases/${caseItem.id}`)}
                       >
                         <TableCell className="font-mono text-sm text-foreground">
                           {caseItem.id.slice(-7).toUpperCase()}
@@ -292,7 +294,7 @@ const CasesList: React.FC = () => {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Button asChild variant="ghost" size="sm">
                             <Link to={`/cases/${caseItem.id}`}>
                               <Eye className="w-4 h-4 mr-1" />

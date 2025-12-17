@@ -5,130 +5,143 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* Medical Coordination Platform Design System */
+/* Brand Colors:
+   - Dark Navy Blue: #0F1B42 (226, 63%, 16%)
+   - Light Gray/Blue: #DEE8EB (194, 26%, 90%)
+   - Teal/Turquoise: #0A9D96 (177, 88%, 33%)
+   - Orange: #F8983A (30, 93%, 60%)
+   - Red: #C61A00 (8, 100%, 39%)
+*/
 
 @layer base {
   :root {
-    /* Medical Blue Theme */
-    --background: 210 40% 98%;
-    --foreground: 215 25% 15%;
+    /* Light Theme - Using Brand Colors */
+    --background: 194 26% 96%;
+    --foreground: 226 63% 16%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 226 63% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 15%;
+    --popover-foreground: 226 63% 16%;
 
-    /* Primary - Deep Medical Blue */
-    --primary: 210 70% 35%;
-    --primary-foreground: 0 0% 100%;
-    --primary-light: 210 60% 50%;
-    --primary-dark: 210 80% 25%;
+    /* Primary - Dark Navy Blue #0F1B42 */
+    --primary: 226 63% 16%;
+    --primary-foreground: 194 26% 96%;
+    --primary-light: 226 50% 30%;
+    --primary-dark: 226 70% 12%;
 
-    /* Secondary - Teal Accent */
-    --secondary: 175 50% 40%;
+    /* Secondary - Teal #0A9D96 */
+    --secondary: 177 88% 33%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 20% 94%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 194 26% 90%;
+    --muted-foreground: 226 40% 35%;
 
-    /* Accent - Warm Gold */
-    --accent: 38 90% 50%;
-    --accent-foreground: 215 25% 15%;
+    /* Accent - Orange #F8983A */
+    --accent: 30 93% 60%;
+    --accent-foreground: 226 63% 16%;
 
-    --destructive: 0 72% 51%;
+    /* Destructive - Red #C61A00 */
+    --destructive: 8 100% 39%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 20% 88%;
-    --input: 210 20% 88%;
-    --ring: 210 70% 35%;
+    --border: 194 20% 82%;
+    --input: 194 20% 85%;
+    --ring: 177 88% 33%;
 
     --radius: 0.625rem;
 
-    /* Status Colors */
-    --status-new: 210 70% 50%;
-    --status-progress: 200 80% 45%;
-    --status-pending: 38 90% 50%;
-    --status-success: 145 63% 42%;
-    --status-error: 0 72% 51%;
-    --status-neutral: 215 15% 55%;
+    /* Status Colors - Using Brand Palette */
+    --status-new: 226 63% 25%;
+    --status-progress: 177 88% 33%;
+    --status-pending: 30 93% 60%;
+    --status-success: 177 70% 35%;
+    --status-error: 8 100% 39%;
+    --status-neutral: 226 30% 50%;
 
     /* Semantic Medical Colors */
-    --medical-urgent: 0 72% 51%;
-    --medical-warning: 38 90% 50%;
-    --medical-safe: 145 63% 42%;
-    --medical-info: 200 80% 45%;
+    --medical-urgent: 8 100% 39%;
+    --medical-warning: 30 93% 60%;
+    --medical-safe: 177 88% 33%;
+    --medical-info: 226 63% 25%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(210 70% 35%), hsl(200 70% 40%));
-    --gradient-secondary: linear-gradient(135deg, hsl(175 50% 40%), hsl(175 50% 50%));
-    --gradient-accent: linear-gradient(135deg, hsl(38 90% 50%), hsl(30 90% 55%));
-    --gradient-hero: linear-gradient(135deg, hsl(210 70% 30%), hsl(200 60% 35%), hsl(175 50% 40%));
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 40% 98%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(226 63% 16%), hsl(226 50% 25%));
+    --gradient-secondary: linear-gradient(135deg, hsl(177 88% 33%), hsl(177 70% 40%));
+    --gradient-accent: linear-gradient(135deg, hsl(30 93% 60%), hsl(30 85% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(226 63% 16%), hsl(226 50% 22%), hsl(177 88% 33%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(194 26% 96%) 100%);
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(215 25% 15% / 0.1), 0 2px 4px -2px hsl(215 25% 15% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.1), 0 4px 6px -4px hsl(215 25% 15% / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(215 25% 15% / 0.1), 0 8px 10px -6px hsl(215 25% 15% / 0.1);
-    --shadow-glow: 0 0 20px hsl(210 70% 35% / 0.3);
+    /* Shadows - Using Navy Blue */
+    --shadow-sm: 0 1px 2px 0 hsl(226 63% 16% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(226 63% 16% / 0.1), 0 2px 4px -2px hsl(226 63% 16% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(226 63% 16% / 0.1), 0 4px 6px -4px hsl(226 63% 16% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(226 63% 16% / 0.1), 0 8px 10px -6px hsl(226 63% 16% / 0.1);
+    --shadow-glow: 0 0 20px hsl(177 88% 33% / 0.3);
 
-    /* Sidebar */
-    --sidebar-background: 210 70% 25%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 210 70% 25%;
-    --sidebar-accent: 210 60% 35%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 210 60% 30%;
-    --sidebar-ring: 210 60% 50%;
+    /* Sidebar - Dark Navy Blue */
+    --sidebar-background: 226 63% 16%;
+    --sidebar-foreground: 194 26% 90%;
+    --sidebar-primary: 177 88% 50%;
+    --sidebar-primary-foreground: 226 63% 16%;
+    --sidebar-accent: 226 50% 25%;
+    --sidebar-accent-foreground: 194 26% 95%;
+    --sidebar-border: 226 50% 22%;
+    --sidebar-ring: 177 88% 33%;
 
-    /* Chart colors */
-    --chart-1: 210 70% 45%;
-    --chart-2: 175 50% 45%;
-    --chart-3: 38 90% 55%;
-    --chart-4: 145 60% 45%;
-    --chart-5: 0 70% 55%;
+    /* Chart colors - Using Brand Palette */
+    --chart-1: 226 63% 25%;
+    --chart-2: 177 88% 38%;
+    --chart-3: 30 93% 60%;
+    --chart-4: 177 70% 45%;
+    --chart-5: 8 100% 45%;
   }
 
   .dark {
-    --background: 215 30% 10%;
-    --foreground: 210 20% 95%;
+    --background: 226 63% 10%;
+    --foreground: 194 26% 92%;
 
-    --card: 215 30% 14%;
-    --card-foreground: 210 20% 95%;
+    --card: 226 55% 14%;
+    --card-foreground: 194 26% 92%;
 
-    --popover: 215 30% 14%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 226 55% 14%;
+    --popover-foreground: 194 26% 92%;
 
-    --primary: 200 70% 50%;
-    --primary-foreground: 215 30% 10%;
-    --primary-light: 200 60% 60%;
-    --primary-dark: 200 80% 40%;
+    /* Primary - Teal in dark mode for better visibility */
+    --primary: 177 88% 45%;
+    --primary-foreground: 226 63% 10%;
+    --primary-light: 177 80% 55%;
+    --primary-dark: 177 90% 35%;
 
-    --secondary: 175 50% 45%;
-    --secondary-foreground: 215 30% 10%;
+    /* Secondary - Navy Blue accent */
+    --secondary: 226 50% 35%;
+    --secondary-foreground: 194 26% 95%;
 
-    --muted: 215 25% 20%;
-    --muted-foreground: 210 15% 60%;
+    --muted: 226 45% 18%;
+    --muted-foreground: 194 20% 65%;
 
-    --accent: 38 85% 55%;
-    --accent-foreground: 215 30% 10%;
+    /* Accent - Orange */
+    --accent: 30 93% 55%;
+    --accent-foreground: 226 63% 10%;
 
-    --destructive: 0 65% 50%;
+    /* Destructive - Red */
+    --destructive: 8 90% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 25% 22%;
-    --input: 215 25% 22%;
-    --ring: 200 70% 50%;
+    --border: 226 45% 22%;
+    --input: 226 45% 22%;
+    --ring: 177 88% 45%;
 
-    --sidebar-background: 215 35% 8%;
-    --sidebar-foreground: 210 20% 85%;
-    --sidebar-primary: 200 70% 50%;
-    --sidebar-primary-foreground: 215 35% 8%;
-    --sidebar-accent: 215 30% 18%;
-    --sidebar-accent-foreground: 210 20% 95%;
-    --sidebar-border: 215 25% 15%;
-    --sidebar-ring: 200 70% 50%;
+    /* Sidebar - Darker Navy */
+    --sidebar-background: 226 65% 8%;
+    --sidebar-foreground: 194 26% 85%;
+    --sidebar-primary: 177 88% 45%;
+    --sidebar-primary-foreground: 226 65% 8%;
+    --sidebar-accent: 226 50% 18%;
+    --sidebar-accent-foreground: 194 26% 95%;
+    --sidebar-border: 226 50% 15%;
+    --sidebar-ring: 177 88% 45%;
   }
 }
 
@@ -149,33 +162,39 @@
 }
 
 @layer components {
-  /* Status Badge Variants */
+  /* Status Badge Variants - Using Brand Colors */
   .status-badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 
   .status-new {
-    @apply bg-blue-100 text-blue-800;
+    background-color: hsl(226 63% 16% / 0.1);
+    color: hsl(226 63% 20%);
   }
 
   .status-progress {
-    @apply bg-cyan-100 text-cyan-800;
+    background-color: hsl(177 88% 33% / 0.15);
+    color: hsl(177 88% 28%);
   }
 
   .status-pending {
-    @apply bg-amber-100 text-amber-800;
+    background-color: hsl(30 93% 60% / 0.15);
+    color: hsl(30 80% 40%);
   }
 
   .status-success {
-    @apply bg-emerald-100 text-emerald-800;
+    background-color: hsl(177 88% 33% / 0.15);
+    color: hsl(177 88% 28%);
   }
 
   .status-error {
-    @apply bg-red-100 text-red-800;
+    background-color: hsl(8 100% 39% / 0.1);
+    color: hsl(8 100% 35%);
   }
 
   .status-neutral {
-    @apply bg-slate-100 text-slate-700;
+    background-color: hsl(194 26% 90%);
+    color: hsl(226 40% 35%);
   }
 
   /* Card Variants */
@@ -234,7 +253,7 @@
 
   .progress-bar-fill {
     @apply h-full rounded-full transition-all duration-500 ease-out;
-    background: var(--gradient-primary);
+    background: var(--gradient-secondary);
   }
 }
 

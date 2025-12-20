@@ -473,9 +473,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       username: userData.username.toLowerCase().trim(),
       id: generateId(userData.role),
     };
+    
+    // Debug logging for user creation
+    console.log('Creating user:', {
+      username: newUser.username,
+      role: newUser.role,
+      passwordLength: newUser.password?.length,
+      passwordPreview: newUser.password?.substring(0, 20) + '...',
+      passwordDecoded: newUser.password ? atob(newUser.password) : 'N/A',
+      passwordChanged: newUser.passwordChanged,
+    });
+    
     await addUser(newUser);
     const usersData = await getAllUsers();
     setUsers(usersData);
+    
+    // Verify user was created correctly
+    const createdUser = await getUserByUsername(newUser.username);
+    if (createdUser) {
+      console.log('User created successfully:', {
+        id: createdUser.id,
+        username: createdUser.username,
+        passwordLength: createdUser.password?.length,
+        passwordDecoded: createdUser.password ? atob(createdUser.password) : 'N/A',
+      });
+    }
+    
     return newUser;
   };
 
@@ -549,7 +572,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     
     // Check if hospital has users
-    const hospitalUsers = users.filter(u => u.hospitalId === hospitalId);
+    const hospitalUsers = users.filter(u => u.hospitalIds && u.hospitalIds.includes(hospitalId));
     if (hospitalUsers.length > 0) {
       throw new Error(`Cannot delete hospital with ${hospitalUsers.length} associated user(s)`);
     }
@@ -681,7 +704,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       : user?.role === 'client'
       ? cases.filter(c => c.clientId === user.id)
       : user?.role === 'hospital'
-      ? cases.filter(c => c.assignedHospital === user.hospitalId)
+      ? cases.filter(c => 
+          c.assignedHospital && 
+          (user.hospitalIds || []).includes(c.assignedHospital)
+        )
       : cases;
 
     return {

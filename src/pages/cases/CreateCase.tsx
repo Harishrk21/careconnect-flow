@@ -89,7 +89,7 @@ const CreateCase: React.FC = () => {
         const normalizedUsername = `client.${formData.patientName.toLowerCase().trim().replace(/\s+/g, '.')}`;
         const defaultPassword = 'client123';
         
-        const client = await createUser({
+      const client = await createUser({
           username: normalizedUsername,
           password: btoa(defaultPassword), 
           role: 'client', 
@@ -100,7 +100,7 @@ const CreateCase: React.FC = () => {
           createdBy: user?.id || '', 
           createdAt: new Date().toISOString(), 
           lastLogin: '',
-        });
+      });
         clientId = client.id;
         clientInfo = {
           name: formData.patientName, 
@@ -235,7 +235,7 @@ const CreateCase: React.FC = () => {
           <CardContent className="grid gap-4 md:grid-cols-2">
             {clientMode === 'new' && (
               <>
-                <div className="space-y-2"><Label>Full Name *</Label><Input value={formData.patientName} onChange={e => updateField('patientName', e.target.value)} required /></div>
+            <div className="space-y-2"><Label>Full Name *</Label><Input value={formData.patientName} onChange={e => updateField('patientName', e.target.value)} required /></div>
               </>
             )}
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={formData.dob} onChange={e => updateField('dob', e.target.value)} /></div>
@@ -252,9 +252,9 @@ const CreateCase: React.FC = () => {
             </div>
             {clientMode === 'new' && (
               <>
-                <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={e => updateField('phone', e.target.value)} /></div>
-                <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => updateField('email', e.target.value)} /></div>
-                <div className="md:col-span-2 space-y-2"><Label>Address</Label><Input value={formData.address} onChange={e => updateField('address', e.target.value)} /></div>
+            <div className="space-y-2"><Label>Phone</Label><Input value={formData.phone} onChange={e => updateField('phone', e.target.value)} /></div>
+            <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => updateField('email', e.target.value)} /></div>
+            <div className="md:col-span-2 space-y-2"><Label>Address</Label><Input value={formData.address} onChange={e => updateField('address', e.target.value)} /></div>
               </>
             )}
             <div className="space-y-2"><Label>Priority</Label>

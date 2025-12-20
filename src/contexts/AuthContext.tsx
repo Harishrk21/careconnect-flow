@@ -57,16 +57,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const normalizedUsername = username.trim().toLowerCase();
       const userData = await getUserByUsername(normalizedUsername);
       
+      // Debug logging
+      console.log('Login attempt:', {
+        providedUsername: username,
+        normalizedUsername,
+        userFound: !!userData,
+        userId: userData?.id,
+        userRole: userData?.role,
+        passwordChanged: userData?.passwordChanged,
+        storedPasswordLength: userData?.password?.length,
+        storedPasswordPreview: userData?.password?.substring(0, 20) + '...',
+      });
+      
       if (!userData) {
+        console.error('Login failed: User not found', { normalizedUsername });
         setIsLoading(false);
         return { success: false, error: 'Invalid username or password' };
       }
 
       // Hash the provided password for comparison
       const hashedPassword = hashPassword(password.trim());
+      const inputPassword = password.trim();
+      
+      // Debug password comparison
+      console.log('Password comparison:', {
+        inputPassword,
+        inputPasswordLength: inputPassword.length,
+        hashedInputPassword: hashedPassword,
+        hashedInputPasswordLength: hashedPassword.length,
+        storedPassword: userData.password,
+        storedPasswordLength: userData.password.length,
+        passwordsMatch: userData.password === hashedPassword,
+        storedPasswordDecoded: atob(userData.password),
+        inputPasswordMatchesDecoded: atob(userData.password) === inputPassword,
+      });
       
       // Compare passwords
       if (userData.password !== hashedPassword) {
+        console.error('Login failed: Password mismatch', {
+          storedPassword: userData.password,
+          hashedInputPassword: hashedPassword,
+          storedPasswordDecoded: atob(userData.password),
+          inputPassword,
+        });
         setIsLoading(false);
         return { success: false, error: 'Invalid username or password' };
       }
@@ -104,6 +137,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user) return false;
 
     try {
+      // Simulate real-time password update with delay
+      await simulateDelay(800);
+      
       const updatedUser = {
         ...user,
         password: hashPassword(newPassword),
@@ -113,6 +149,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       await updateUser(updatedUser);
       setUser(updatedUser);
+      
+      console.log('Password updated successfully:', {
+        userId: updatedUser.id,
+        username: updatedUser.username,
+        passwordChanged: updatedUser.passwordChanged,
+      });
+      
       return true;
     } catch (error) {
       console.error('Password update error:', error);

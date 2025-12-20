@@ -72,7 +72,7 @@ const UserManagement: React.FC = () => {
     email: '',
     phone: '',
     role: 'agent' as UserRole,
-    hospitalId: '',
+    hospitalIds: [] as string[],
     password: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -125,7 +125,7 @@ const UserManagement: React.FC = () => {
       email: '',
       phone: '',
       role: 'agent',
-      hospitalId: '',
+      hospitalIds: [] as string[],
       password: '',
     });
     setSelectedUser(null);
@@ -136,6 +136,15 @@ const UserManagement: React.FC = () => {
       toast({
         title: 'Validation Error',
         description: 'Please fill all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (formData.role === 'hospital' && formData.hospitalIds.length === 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select at least one hospital for hospital agents',
         variant: 'destructive',
       });
       return;
@@ -154,9 +163,9 @@ const UserManagement: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await createUser({
-        username: formData.username.toLowerCase(),
-        password: btoa(formData.password), // Hash password
+      const createdUser = await createUser({
+        username: formData.username.toLowerCase().trim(),
+        password: btoa(formData.password.trim()), // Hash password
         role: formData.role,
         name: formData.name,
         email: formData.email,
@@ -165,21 +174,28 @@ const UserManagement: React.FC = () => {
         createdBy: currentUser?.id || 'system',
         createdAt: new Date().toISOString(),
         lastLogin: '',
-        hospitalId: formData.role === 'hospital' ? formData.hospitalId : undefined,
+        hospitalIds: formData.role === 'hospital' ? formData.hospitalIds : undefined,
       });
       
-      toast({
-        title: 'User Created',
-        description: `${formData.name} has been created successfully`,
-      });
-      
-      setIsCreateDialogOpen(false);
-      resetForm();
-      await refreshUsers();
+      // Only show success if user was actually created
+      if (createdUser) {
+        const defaultPassword = formData.password;
+        toast({
+          title: 'User Created',
+          description: `${formData.name} has been created successfully. Username: ${createdUser.username}. Default password: ${defaultPassword}. First-time login will require password reset.`,
+        });
+        
+        setIsCreateDialogOpen(false);
+        resetForm();
+        await refreshUsers();
+      } else {
+        throw new Error('Failed to create user');
+      }
     } catch (error) {
+      console.error('Error creating user:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create user',
+        description: error instanceof Error ? error.message : 'Failed to create user',
         variant: 'destructive',
       });
     } finally {
@@ -195,7 +211,7 @@ const UserManagement: React.FC = () => {
       email: user.email,
       phone: user.phone,
       role: user.role,
-      hospitalId: user.hospitalId || '',
+      hospitalIds: user.hospitalIds || [],
       password: '', // Don't pre-fill password
     });
     setIsEditDialogOpen(true);
@@ -234,7 +250,7 @@ const UserManagement: React.FC = () => {
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
-        hospitalId: formData.role === 'hospital' ? formData.hospitalId : undefined,
+        hospitalIds: formData.role === 'hospital' ? formData.hospitalIds : undefined,
       };
 
       // Only update password if provided
@@ -560,7 +576,7 @@ const UserManagement: React.FC = () => {
                 id="create-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Dr. John Doe"
+                placeholder="John Doe"
               />
             </div>
 
@@ -588,22 +604,37 @@ const UserManagement: React.FC = () => {
 
             {formData.role === 'hospital' && (
               <div className="space-y-2">
-                <Label htmlFor="create-hospital">Assign to Hospital Location *</Label>
-                <Select
-                  value={formData.hospitalId}
-                  onValueChange={(value) => setFormData({ ...formData, hospitalId: value })}
-                >
-                  <SelectTrigger id="create-hospital">
-                    <SelectValue placeholder="Select hospital location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {hospitals.map((h) => (
-                      <SelectItem key={h.id} value={h.id}>
+                <Label htmlFor="create-hospital">Assign to Hospital Location(s) *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select one or more hospitals this agent will handle
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {hospitals.map((h) => (
+                    <div key={h.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`create-hospital-${h.id}`}
+                        checked={formData.hospitalIds.includes(h.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, hospitalIds: [...formData.hospitalIds, h.id] });
+                          } else {
+                            setFormData({ ...formData, hospitalIds: formData.hospitalIds.filter(id => id !== h.id) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <label htmlFor={`create-hospital-${h.id}`} className="text-sm cursor-pointer flex-1">
                         {h.name} - {h.city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.hospitalIds.length === 0 && (
+                  <p className="text-xs text-medical-warning mt-1">
+                    Please select at least one hospital
+                  </p>
+                )}
               </div>
             )}
 
@@ -704,22 +735,37 @@ const UserManagement: React.FC = () => {
 
             {formData.role === 'hospital' && (
               <div className="space-y-2">
-                <Label htmlFor="edit-hospital">Assign to Hospital Location *</Label>
-                <Select
-                  value={formData.hospitalId}
-                  onValueChange={(value) => setFormData({ ...formData, hospitalId: value })}
-                >
-                  <SelectTrigger id="edit-hospital">
-                    <SelectValue placeholder="Select hospital location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {hospitals.map((h) => (
-                      <SelectItem key={h.id} value={h.id}>
+                <Label htmlFor="edit-hospital">Assign to Hospital Location(s) *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select one or more hospitals this agent will handle
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {hospitals.map((h) => (
+                    <div key={h.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`edit-hospital-${h.id}`}
+                        checked={formData.hospitalIds.includes(h.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, hospitalIds: [...formData.hospitalIds, h.id] });
+                          } else {
+                            setFormData({ ...formData, hospitalIds: formData.hospitalIds.filter(id => id !== h.id) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <label htmlFor={`edit-hospital-${h.id}`} className="text-sm cursor-pointer flex-1">
                         {h.name} - {h.city}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.hospitalIds.length === 0 && (
+                  <p className="text-xs text-medical-warning mt-1">
+                    Please select at least one hospital
+                  </p>
+                )}
               </div>
             )}
 

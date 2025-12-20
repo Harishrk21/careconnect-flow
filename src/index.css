@@ -5,18 +5,19 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@300;400;500;600;700&display=swap');
 
 /* SudInd Portal Design System */
-/* Brand Colors:
-   - Dark Navy Blue: #0F1B42 (226, 63%, 16%)
-   - Light Gray/Blue: #DEE8EB (194, 26%, 90%)
-   - Teal/Turquoise: #0A9D96 (177, 88%, 33%)
-   - Orange: #F8983A (30, 93%, 60%)
-   - Red: #C61A00 (8, 100%, 39%)
+/* Brand Colors - Matching Logo:
+   - Deep Dark Blue/Indigo: #0F1B42 (226, 63%, 16%) - Primary text
+   - Vibrant Teal/Cyan: #00CED1 (181, 100%, 41%) - Secondary/Accent
+   - Reddish-Orange: #E04D36 (10, 70%, 55%) - Accent
+   - Creamy Yellow-Orange: #F0A500 (40, 100%, 47%) - Accent
+   - White: #FFFFFF (0, 0%, 100%) - Backgrounds
+   - Light Gray: #F5F5F5 (0, 0%, 96%) - Subtle elements
 */
 
 @layer base {
   :root {
-    /* Light Theme - Using Brand Colors */
-    --background: 194 26% 96%;
+    /* Light Theme - Matching Logo Colors */
+    --background: 0 0% 100%;
     --foreground: 226 63% 16%;
 
     --card: 0 0% 100%;
@@ -25,104 +26,104 @@
     --popover: 0 0% 100%;
     --popover-foreground: 226 63% 16%;
 
-    /* Primary - Dark Navy Blue #0F1B42 */
+    /* Primary - Deep Dark Blue #0F1B42 */
     --primary: 226 63% 16%;
-    --primary-foreground: 194 26% 96%;
+    --primary-foreground: 0 0% 100%;
     --primary-light: 226 50% 30%;
     --primary-dark: 226 70% 12%;
 
-    /* Secondary - Teal #0A9D96 */
-    --secondary: 177 88% 33%;
+    /* Secondary - Vibrant Teal/Cyan #00CED1 */
+    --secondary: 181 100% 41%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 194 26% 90%;
+    --muted: 0 0% 96%;
     --muted-foreground: 226 40% 35%;
 
-    /* Accent - Orange #F8983A */
-    --accent: 30 93% 60%;
-    --accent-foreground: 226 63% 16%;
+    /* Accent - Reddish-Orange #E04D36 */
+    --accent: 10 70% 55%;
+    --accent-foreground: 0 0% 100%;
 
-    /* Destructive - Red #C61A00 */
+    /* Destructive - Red */
     --destructive: 8 100% 39%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 194 20% 82%;
-    --input: 194 20% 85%;
-    --ring: 177 88% 33%;
+    --border: 0 0% 90%;
+    --input: 0 0% 92%;
+    --ring: 181 100% 41%;
 
     --radius: 0.625rem;
 
-    /* Status Colors - Using Brand Palette */
+    /* Status Colors - Logo Palette */
     --status-new: 226 63% 25%;
-    --status-progress: 177 88% 33%;
-    --status-pending: 30 93% 60%;
-    --status-success: 177 70% 35%;
+    --status-progress: 181 100% 41%;
+    --status-pending: 40 100% 47%;
+    --status-success: 120 50% 45%;
     --status-error: 8 100% 39%;
     --status-neutral: 226 30% 50%;
 
     /* Semantic Medical Colors */
     --medical-urgent: 8 100% 39%;
-    --medical-warning: 30 93% 60%;
-    --medical-safe: 177 88% 33%;
+    --medical-warning: 40 100% 47%;
+    --medical-safe: 181 100% 41%;
     --medical-info: 226 63% 25%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(226 63% 16%), hsl(226 50% 25%));
-    --gradient-secondary: linear-gradient(135deg, hsl(177 88% 33%), hsl(177 70% 40%));
-    --gradient-accent: linear-gradient(135deg, hsl(30 93% 60%), hsl(30 85% 55%));
-    --gradient-hero: linear-gradient(135deg, hsl(226 63% 16%), hsl(226 50% 22%), hsl(177 88% 33%));
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(194 26% 96%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(181 100% 41%), hsl(181 85% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(10 70% 55%), hsl(40 100% 47%));
+    --gradient-hero: linear-gradient(135deg, hsl(226 63% 16%), hsl(181 100% 41%), hsl(10 70% 55%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 100%);
 
-    /* Shadows - Using Navy Blue */
+    /* Shadows - Using Dark Blue */
     --shadow-sm: 0 1px 2px 0 hsl(226 63% 16% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(226 63% 16% / 0.1), 0 2px 4px -2px hsl(226 63% 16% / 0.1);
     --shadow-lg: 0 10px 15px -3px hsl(226 63% 16% / 0.1), 0 4px 6px -4px hsl(226 63% 16% / 0.1);
     --shadow-xl: 0 20px 25px -5px hsl(226 63% 16% / 0.1), 0 8px 10px -6px hsl(226 63% 16% / 0.1);
-    --shadow-glow: 0 0 20px hsl(177 88% 33% / 0.3);
+    --shadow-glow: 0 0 20px hsl(181 100% 41% / 0.3);
 
-    /* Sidebar - Dark Navy Blue */
+    /* Sidebar - Deep Dark Blue */
     --sidebar-background: 226 63% 16%;
-    --sidebar-foreground: 194 26% 90%;
-    --sidebar-primary: 177 88% 50%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 181 100% 50%;
     --sidebar-primary-foreground: 226 63% 16%;
     --sidebar-accent: 226 50% 25%;
-    --sidebar-accent-foreground: 194 26% 95%;
+    --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 226 50% 22%;
-    --sidebar-ring: 177 88% 33%;
+    --sidebar-ring: 181 100% 41%;
 
-    /* Chart colors - Using Brand Palette */
+    /* Chart colors - Logo Palette */
     --chart-1: 226 63% 25%;
-    --chart-2: 177 88% 38%;
-    --chart-3: 30 93% 60%;
-    --chart-4: 177 70% 45%;
+    --chart-2: 181 100% 45%;
+    --chart-3: 10 70% 55%;
+    --chart-4: 40 100% 47%;
     --chart-5: 8 100% 45%;
   }
 
   .dark {
     --background: 226 63% 10%;
-    --foreground: 194 26% 92%;
+    --foreground: 0 0% 95%;
 
     --card: 226 55% 14%;
-    --card-foreground: 194 26% 92%;
+    --card-foreground: 0 0% 95%;
 
     --popover: 226 55% 14%;
-    --popover-foreground: 194 26% 92%;
+    --popover-foreground: 0 0% 95%;
 
     /* Primary - Teal in dark mode for better visibility */
-    --primary: 177 88% 45%;
+    --primary: 181 100% 45%;
     --primary-foreground: 226 63% 10%;
-    --primary-light: 177 80% 55%;
-    --primary-dark: 177 90% 35%;
+    --primary-light: 181 85% 55%;
+    --primary-dark: 181 100% 35%;
 
-    /* Secondary - Navy Blue accent */
+    /* Secondary - Dark Blue accent */
     --secondary: 226 50% 35%;
-    --secondary-foreground: 194 26% 95%;
+    --secondary-foreground: 0 0% 95%;
 
     --muted: 226 45% 18%;
-    --muted-foreground: 194 20% 65%;
+    --muted-foreground: 0 0% 70%;
 
-    /* Accent - Orange */
-    --accent: 30 93% 55%;
+    /* Accent - Reddish-Orange */
+    --accent: 10 70% 60%;
     --accent-foreground: 226 63% 10%;
 
     /* Destructive - Red */
@@ -131,17 +132,17 @@
 
     --border: 226 45% 22%;
     --input: 226 45% 22%;
-    --ring: 177 88% 45%;
+    --ring: 181 100% 45%;
 
-    /* Sidebar - Darker Navy */
+    /* Sidebar - Darker Blue */
     --sidebar-background: 226 65% 8%;
-    --sidebar-foreground: 194 26% 85%;
-    --sidebar-primary: 177 88% 45%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 181 100% 45%;
     --sidebar-primary-foreground: 226 65% 8%;
     --sidebar-accent: 226 50% 18%;
-    --sidebar-accent-foreground: 194 26% 95%;
+    --sidebar-accent-foreground: 0 0% 95%;
     --sidebar-border: 226 50% 15%;
-    --sidebar-ring: 177 88% 45%;
+    --sidebar-ring: 181 100% 45%;
   }
 }
 
@@ -173,18 +174,18 @@
   }
 
   .status-progress {
-    background-color: hsl(177 88% 33% / 0.15);
-    color: hsl(177 88% 28%);
+    background-color: hsl(181 100% 41% / 0.15);
+    color: hsl(181 100% 35%);
   }
 
   .status-pending {
-    background-color: hsl(30 93% 60% / 0.15);
-    color: hsl(30 80% 40%);
+    background-color: hsl(40 100% 47% / 0.15);
+    color: hsl(40 80% 40%);
   }
 
   .status-success {
-    background-color: hsl(177 88% 33% / 0.15);
-    color: hsl(177 88% 28%);
+    background-color: hsl(120 50% 45% / 0.15);
+    color: hsl(120 50% 35%);
   }
 
   .status-error {
@@ -193,8 +194,8 @@
   }
 
   .status-neutral {
-    background-color: hsl(194 26% 90%);
-    color: hsl(226 40% 35%);
+    background-color: hsl(0 0% 96%);
+    color: hsl(226 30% 50%);
   }
 
   /* Card Variants */

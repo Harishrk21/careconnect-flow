@@ -1,22 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAllUsers } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Loader2, Eye, EyeOff, Shield, Stethoscope, Plane, Users, CheckCircle2, Globe } from 'lucide-react';
+import { Heart, Loader2, Eye, EyeOff, Stethoscope, Plane, Users, CheckCircle2, Globe } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, updatePassword, isLoading, isAuthenticated, user } = useAuth();
+  const { login, isLoading, isAuthenticated, user } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,16 +28,71 @@ const Login: React.FC = () => {
       return;
     }
 
+    // Debug: Fetch and log user data before login attempt
+    try {
+      const allUsers = await getAllUsers();
+      const normalizedInputUsername = username.trim().toLowerCase();
+      const matchingUser = allUsers.find(u => u.username.toLowerCase().trim() === normalizedInputUsername);
+      
+      console.group('🔍 Login Debug Information');
+      console.log('Input Credentials:', {
+        username: username.trim(),
+        normalizedUsername: normalizedInputUsername,
+        password: password.trim(),
+        passwordLength: password.trim().length,
+      });
+      
+      if (matchingUser) {
+        const storedPasswordDecoded = atob(matchingUser.password);
+        const inputPassword = password.trim();
+        const passwordMatch = storedPasswordDecoded === inputPassword;
+        const hashMatch = matchingUser.password === btoa(inputPassword);
+        
+        console.log('✅ Found User in Database:', {
+          id: matchingUser.id,
+          username: matchingUser.username,
+          role: matchingUser.role,
+          name: matchingUser.name,
+          passwordChanged: matchingUser.passwordChanged,
+          storedPasswordHash: matchingUser.password,
+          storedPasswordHashLength: matchingUser.password.length,
+          storedPasswordDecoded: storedPasswordDecoded,
+          inputPassword: inputPassword,
+          passwordMatch: passwordMatch,
+          hashMatch: hashMatch,
+          expectedPasswordForClient: 'client123',
+        });
+        
+        if (!passwordMatch && !hashMatch) {
+          console.error('❌ Password Mismatch Details:', {
+            storedDecoded: storedPasswordDecoded,
+            inputPassword: inputPassword,
+            storedHash: matchingUser.password,
+            inputHash: btoa(inputPassword),
+            storedLength: storedPasswordDecoded.length,
+            inputLength: inputPassword.length,
+          });
+        }
+      } else {
+        console.warn('❌ User not found in database');
+        console.log('Available users in database:', allUsers.map(u => ({
+          username: u.username,
+          role: u.role,
+          passwordChanged: u.passwordChanged,
+          passwordDecoded: u.password ? atob(u.password) : 'N/A',
+        })));
+      }
+      console.groupEnd();
+    } catch (error) {
+      console.error('Error fetching users for debug:', error);
+    }
+
     const result = await login(username.trim(), password);
     
     if (result.success) {
       if (result.requiresPasswordChange) {
-        setShowPasswordChange(true);
-        toast({
-          title: 'Password Change Required',
-          description: 'Please set a new password for your account',
-        });
-        // Don't navigate - stay on login page to change password
+        // Redirect to password reset page immediately
+        navigate('/reset-password', { replace: true });
       } else {
         toast({
           title: 'Welcome back!',
@@ -56,53 +109,9 @@ const Login: React.FC = () => {
     }
   };
 
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (newPassword.length < 6) {
-      toast({
-        title: 'Error',
-        description: 'Password must be at least 6 characters',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: 'Error',
-        description: 'Passwords do not match',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const success = await updatePassword(newPassword);
-    
-    if (success) {
-      toast({
-        title: 'Success',
-        description: 'Password updated successfully. Redirecting to dashboard...',
-      });
-      setShowPasswordChange(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      // Redirect to dashboard after password change
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 1000);
-    } else {
-      toast({
-        title: 'Error',
-        description: 'Failed to update password',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Redirect if already authenticated and password changed (but not showing password change form)
+  // Redirect if already authenticated and password changed
   useEffect(() => {
-    if (isAuthenticated && user?.passwordChanged && !showPasswordChange) {
+    if (isAuthenticated && user?.passwordChanged) {
       navigate('/dashboard', { replace: true });
     }
     // Only depend on isAuthenticated to prevent loops
@@ -220,107 +229,57 @@ const Login: React.FC = () => {
             </CardHeader>
         
         <CardContent>
-          {!showPasswordChange ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-foreground">Username</Label>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="text-foreground">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="bg-background border-border focus:border-primary"
+                disabled={isLoading}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-foreground">Password</Label>
+              <div className="relative">
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="bg-background border-border focus:border-primary"
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-background border-border focus:border-primary pr-10"
                   disabled={isLoading}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="bg-background border-border focus:border-primary pr-10"
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              
-              <Button
-                type="submit"
-                className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground font-medium h-11"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div className="flex items-center gap-2 p-3 bg-medical-warning/10 rounded-lg border border-medical-warning/20 mb-4">
-                <Shield className="w-5 h-5 text-medical-warning flex-shrink-0" />
-                <p className="text-sm text-foreground">
-                  First time login - please set a new password
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="newPassword" className="text-foreground">New Password</Label>
-                <Input
-                  id="newPassword"
-                  type="password"
-                  placeholder="Enter new password (min 6 characters)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="bg-background border-border focus:border-primary"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="bg-background border-border focus:border-primary"
-                />
-              </div>
-              
-              <Button
-                type="submit"
-                className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground font-medium h-11"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Set New Password'
-                )}
-              </Button>
-            </form>
-          )}
+            </div>
+            
+            <Button
+              type="submit"
+              className="w-full bg-gradient-primary hover:opacity-90 text-primary-foreground font-medium h-11"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+          </form>
           
           <div className="mt-6 pt-4 border-t border-border">
             <p className="text-xs text-muted-foreground text-center mb-3">Demo Credentials</p>

@@ -80,7 +80,10 @@ const Documents: React.FC = () => {
       : user?.role === 'agent'
       ? cases.filter(c => c.agentId === user.id)
       : user?.role === 'hospital'
-      ? cases.filter(c => c.assignedHospital === user.hospitalId)
+      ? cases.filter(c => 
+          c.assignedHospital && 
+          (user.hospitalIds || []).includes(c.assignedHospital)
+        )
       : [];
     
     userCases.forEach((caseItem) => {

@@ -331,7 +331,7 @@ const HospitalManagement: React.FC = () => {
   };
 
   const getHospitalUsers = (hospitalId: string) => {
-    return users.filter(u => u.hospitalId === hospitalId);
+    return users.filter(u => u.hospitalIds && u.hospitalIds.includes(hospitalId));
   };
 
   const getHospitalCases = (hospitalId: string) => {
@@ -618,7 +618,7 @@ const HospitalManagement: React.FC = () => {
                   id="create-contact"
                   value={formData.contactPerson}
                   onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                  placeholder="Dr. John Doe"
+                  placeholder="John Doe"
                 />
               </div>
             </div>

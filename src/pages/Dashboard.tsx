@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FolderKanban, 
   Clock, 
@@ -15,13 +16,15 @@ import {
   Building2,
   FileText,
   Plus,
-  Eye
+  Eye,
+  Activity,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { STATUS_LABELS, STATUS_COLORS } from '@/types';
+import { STATUS_LABELS, STATUS_COLORS, type Case } from '@/types';
 import ClientDashboard from './dashboards/ClientDashboard';
 import HospitalDashboard from './dashboards/HospitalDashboard';
 import FinanceDashboard from './dashboards/FinanceDashboard';
+import ActivityTimeline from '@/components/cases/ActivityTimeline';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -40,7 +43,10 @@ const Dashboard: React.FC = () => {
       case 'client':
         return cases.filter(c => c.clientId === user.id);
       case 'hospital':
-        return cases.filter(c => c.assignedHospital === user.hospitalId);
+        return cases.filter(c => 
+          c.assignedHospital && 
+          (user.hospitalIds || []).includes(c.assignedHospital)
+        );
       case 'finance':
         return cases.filter(c => 
           c.status === 'visa_processing_payments' || 
@@ -337,42 +343,83 @@ const Dashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Client-specific view */}
-      {user?.role === 'client' && userCases.length > 0 && (
+      {/* Complete Case Information with Activity Timeline - For Admin/Agent */}
+      {(user?.role === 'admin' || user?.role === 'agent') && recentCases.length > 0 && (
         <Card className="card-elevated">
           <CardHeader>
-            <CardTitle className="text-foreground">Your Case Status</CardTitle>
-            <CardDescription>Track the progress of your medical journey</CardDescription>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Case Details & Activity Timeline
+            </CardTitle>
+            <CardDescription>Complete information and activity tracking for your cases</CardDescription>
           </CardHeader>
           <CardContent>
-            {userCases.map((caseItem) => (
-              <Link
-                key={caseItem.id}
-                to={`/cases/${caseItem.id}`}
-                className="block p-4 rounded-lg border border-border hover:border-primary/30 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{caseItem.clientInfo.condition}</h3>
-                    <p className="text-sm text-muted-foreground">Case ID: {caseItem.id}</p>
+            <Tabs defaultValue={recentCases[0]?.id || 'none'} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 max-h-[200px] overflow-y-auto">
+                {recentCases.slice(0, 5).map((caseItem) => (
+                  <TabsTrigger key={caseItem.id} value={caseItem.id} className="text-xs">
+                    {caseItem.clientInfo.name.slice(0, 15)}...
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {recentCases.slice(0, 5).map((caseItem) => (
+                <TabsContent key={caseItem.id} value={caseItem.id} className="space-y-4 mt-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Case ID</p>
+                        <p className="text-sm font-medium text-foreground">{caseItem.id}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Patient Name</p>
+                        <p className="text-sm font-medium text-foreground">{caseItem.clientInfo.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Current Status</p>
+                        <Badge variant="outline" className={getStatusBadgeClass(caseItem.status)}>
+                          {STATUS_LABELS[caseItem.status]}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Medical Condition</p>
+                        <p className="text-sm text-foreground">{caseItem.clientInfo.condition}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Priority</p>
+                        <Badge variant="outline" className={
+                          caseItem.priority === 'urgent' ? 'bg-medical-urgent/10 text-medical-urgent border-medical-urgent/30' :
+                          caseItem.priority === 'high' ? 'bg-medical-warning/10 text-medical-warning border-medical-warning/30' :
+                          'bg-muted'
+                        }>
+                          {caseItem.priority}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Documents</p>
+                        <p className="text-sm text-foreground">{caseItem.documents.length} document(s)</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Last Updated</p>
+                        <p className="text-sm text-foreground">{new Date(caseItem.updatedAt).toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Comments</p>
+                        <p className="text-sm text-foreground">{caseItem.comments.length} message(s)</p>
+                      </div>
+                    </div>
                   </div>
-                  <Badge className={getStatusBadgeClass(caseItem.status)}>
-                    {STATUS_LABELS[caseItem.status]}
-                  </Badge>
-                </div>
-                <div className="progress-bar">
-                  <div 
-                    className="progress-bar-fill" 
-                    style={{ 
-                      width: `${(Object.keys(STATUS_LABELS).indexOf(caseItem.status) + 1) / Object.keys(STATUS_LABELS).length * 100}%` 
-                    }} 
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Last updated: {new Date(caseItem.updatedAt).toLocaleString()}
-                </p>
-              </Link>
-            ))}
+                  <ActivityTimeline caseData={caseItem} compact={true} />
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to={`/cases/${caseItem.id}`}>
+                      View Full Case Details
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Link>
+                  </Button>
+                </TabsContent>
+              ))}
+            </Tabs>
           </CardContent>
         </Card>
       )}

@@ -32,7 +32,7 @@ const CreateClient: React.FC = () => {
       const normalizedUsername = `client.${formData.name.toLowerCase().trim().replace(/\s+/g, '.')}`;
       const defaultPassword = 'client123';
       
-      await createUser({
+      const createdClient = await createUser({
         username: normalizedUsername,
         password: btoa(defaultPassword), 
         role: 'client', 
@@ -44,13 +44,27 @@ const CreateClient: React.FC = () => {
         createdAt: new Date().toISOString(), 
         lastLogin: '',
       });
-      toast({ 
-        title: 'Success', 
-        description: `Client account created successfully for ${formData.name}. Default password: client123` 
-      });
-      navigate('/clients');
+      
+      // Only show success if user was actually created
+      if (createdClient) {
+        toast({ 
+          title: 'Success', 
+          description: `Client account created successfully for ${formData.name}. Username: ${normalizedUsername}. Default password: ${defaultPassword}` 
+        });
+        // Small delay before navigation to ensure toast is visible
+        setTimeout(() => {
+          navigate('/clients');
+        }, 500);
+      } else {
+        throw new Error('Failed to create client');
+      }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to create client', variant: 'destructive' });
+      console.error('Error creating client:', error);
+      toast({ 
+        title: 'Error', 
+        description: error instanceof Error ? error.message : 'Failed to create client', 
+        variant: 'destructive' 
+      });
     } finally { 
       setLoading(false); 
     }
@@ -164,3 +178,4 @@ const CreateClient: React.FC = () => {
 };
 
 export default CreateClient;
+

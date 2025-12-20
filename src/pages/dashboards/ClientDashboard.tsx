@@ -5,6 +5,7 @@ import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   FolderKanban, 
   Clock, 
@@ -16,9 +17,12 @@ import {
   Stethoscope,
   Activity,
   MessageSquare,
+  Eye,
+  Download,
 } from 'lucide-react';
-import { STATUS_LABELS, STATUS_COLORS, STATUS_FLOW, type Case } from '@/types';
+import { STATUS_LABELS, STATUS_COLORS, STATUS_FLOW, DOCUMENT_TYPE_LABELS, type Case } from '@/types';
 import { cn } from '@/lib/utils';
+import ActivityTimeline from '@/components/cases/ActivityTimeline';
 
 const ClientDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -367,6 +371,235 @@ const ClientDashboard: React.FC = () => {
           </Card>
         )}
       </div>
+
+      {/* Complete Case Information - View Only */}
+      {activeCase && (
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <FolderKanban className="w-5 h-5 text-primary" />
+              Complete Case Information
+            </CardTitle>
+            <CardDescription>View all details about your case (Read-only)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="payments">Payments</TabsTrigger>
+              </TabsList>
+
+              {/* Overview Tab */}
+              <TabsContent value="overview" className="space-y-4 mt-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Case ID</p>
+                      <p className="text-sm font-medium text-foreground">{activeCase.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Current Status</p>
+                      <Badge variant="outline" className={getStatusBadgeClass(activeCase.status)}>
+                        {STATUS_LABELS[activeCase.status]}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Priority</p>
+                      <Badge variant="outline" className={
+                        activeCase.priority === 'urgent' ? 'bg-medical-urgent/10 text-medical-urgent border-medical-urgent/30' :
+                        activeCase.priority === 'high' ? 'bg-medical-warning/10 text-medical-warning border-medical-warning/30' :
+                        'bg-muted'
+                      }>
+                        {activeCase.priority}
+                      </Badge>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Created</p>
+                      <p className="text-sm text-foreground">{new Date(activeCase.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Last Updated</p>
+                      <p className="text-sm text-foreground">{new Date(activeCase.updatedAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Medical Condition</p>
+                      <p className="text-sm font-medium text-foreground">{activeCase.clientInfo.condition}</p>
+                    </div>
+                    {activeCase.clientInfo.passport && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Passport Number</p>
+                        <p className="text-sm text-foreground">{activeCase.clientInfo.passport}</p>
+                      </div>
+                    )}
+                    {activeCase.assignedHospital && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Assigned Hospital Agent</p>
+                        <p className="text-sm text-foreground">Hospital ID: {activeCase.assignedHospital.slice(-7).toUpperCase()}</p>
+                      </div>
+                    )}
+                    {activeCase.treatmentPlan && (
+                      <>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Treatment</p>
+                          <p className="text-sm text-foreground">{activeCase.treatmentPlan.proposedTreatment}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Estimated Duration</p>
+                          <p className="text-sm text-foreground">{activeCase.treatmentPlan.estimatedDuration}</p>
+                        </div>
+                        {activeCase.treatmentPlan.estimatedCost && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Estimated Cost</p>
+                            <p className="text-sm text-foreground">
+                              {activeCase.treatmentPlan.currency === 'USD' ? '$' : '₹'} {activeCase.treatmentPlan.estimatedCost.toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Documents Tab - View Only */}
+              <TabsContent value="documents" className="space-y-4 mt-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-foreground">
+                      Total Documents: {activeCase.documents.length}
+                    </p>
+                  </div>
+                  {activeCase.documents.length > 0 ? (
+                    <div className="space-y-2">
+                      {activeCase.documents.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className="w-5 h-5 text-primary flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{doc.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {DOCUMENT_TYPE_LABELS[doc.type]} • {new Date(doc.uploadedAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (doc.fileData) {
+                                  const link = document.createElement('a');
+                                  link.href = doc.fileData;
+                                  link.download = doc.name;
+                                  link.click();
+                                }
+                              }}
+                              className="h-8"
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (doc.fileData) {
+                                  const link = document.createElement('a');
+                                  link.href = doc.fileData;
+                                  link.download = doc.name;
+                                  link.click();
+                                }
+                              }}
+                              className="h-8"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-sm">No documents uploaded yet</p>
+                    </div>
+                  )}
+                </div>
+                <Button asChild variant="outline" className="w-full">
+                  <Link to={`/cases/${activeCase.id}`}>
+                    View All Documents in Detail
+                  </Link>
+                </Button>
+              </TabsContent>
+
+              {/* Timeline Tab - Activity & Status History */}
+              <TabsContent value="timeline" className="space-y-4 mt-4">
+                <ActivityTimeline caseData={activeCase} compact={false} />
+                <Button asChild variant="outline" className="w-full">
+                  <Link to={`/cases/${activeCase.id}`}>
+                    View Complete Timeline
+                  </Link>
+                </Button>
+              </TabsContent>
+
+              {/* Payments Tab */}
+              <TabsContent value="payments" className="space-y-4 mt-4">
+                {activeCase.payments.length > 0 ? (
+                  <div className="space-y-3">
+                    {activeCase.payments.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="p-4 bg-muted/30 rounded-lg border border-border"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {payment.type} - {payment.currency}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(payment.date).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className={
+                            payment.status === 'completed' ? 'bg-medical-safe/10 text-medical-safe border-medical-safe/30' :
+                            payment.status === 'pending' ? 'bg-medical-warning/10 text-medical-warning border-medical-warning/30' :
+                            'bg-medical-urgent/10 text-medical-urgent border-medical-urgent/30'
+                          }>
+                            {payment.status}
+                          </Badge>
+                        </div>
+                        <p className="text-lg font-bold text-foreground">
+                          {payment.currency === 'USD' ? '$' : payment.currency === 'INR' ? '₹' : payment.currency} {payment.amount.toLocaleString()}
+                        </p>
+                        {payment.notes && (
+                          <p className="text-xs text-muted-foreground mt-2">{payment.notes}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm">No payment records yet</p>
+                  </div>
+                )}
+                <Button asChild variant="outline" className="w-full">
+                  <Link to={`/cases/${activeCase.id}`}>
+                    View Payment Details
+                  </Link>
+                </Button>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Actions */}
       <Card className="card-elevated">

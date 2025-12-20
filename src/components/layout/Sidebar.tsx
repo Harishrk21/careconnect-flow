@@ -117,14 +117,14 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       )}
     >
       {/* Header */}
-      <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
+      <div className="flex items-center h-16 px-4 border-b border-sidebar-border bg-white/95 rounded-br-lg">
         <div className="flex items-center gap-3 overflow-hidden">
           {collapsed ? (
-            <div className="w-9 h-9 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
               <img 
                 src="/logo.png" 
                 alt="SudInd" 
-                className="h-8 w-auto"
+                className="h-12 w-auto object-contain"
               />
             </div>
           ) : (
@@ -132,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
               <img 
                 src="/logo.png" 
                 alt="SudInd" 
-                className="h-10 w-auto"
+                className="h-14 w-auto object-contain"
               />
             </div>
           )}

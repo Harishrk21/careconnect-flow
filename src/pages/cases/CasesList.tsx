@@ -53,7 +53,10 @@ const CasesList: React.FC = () => {
       case 'agent':
         return cases.filter(c => c.agentId === user.id);
       case 'hospital':
-        return cases.filter(c => c.assignedHospital === user.hospitalId);
+        return cases.filter(c => 
+          c.assignedHospital && 
+          (user.hospitalIds || []).includes(c.assignedHospital)
+        );
       case 'finance':
         return cases.filter(c => 
           c.status === 'visa_processing_payments' || 

@@ -309,13 +309,17 @@ const Settings: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                {user.hospitalId && (
+                {user.hospitalIds && user.hospitalIds.length > 0 && (
                   <div className="space-y-2 md:col-span-2">
-                    <Label className="text-muted-foreground">Associated Hospital</Label>
-                    <div className="p-2 bg-muted/30 rounded-md">
-                      <span className="text-sm text-foreground">
-                        {hospitals.find(h => h.id === user.hospitalId)?.name || user.hospitalId}
-                      </span>
+                    <Label className="text-muted-foreground">Associated Hospitals</Label>
+                    <div className="space-y-1">
+                      {user.hospitalIds.map((hospitalId) => (
+                        <div key={hospitalId} className="p-2 bg-muted/30 rounded-md">
+                          <span className="text-sm text-foreground">
+                            {hospitals.find(h => h.id === hospitalId)?.name || hospitalId}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

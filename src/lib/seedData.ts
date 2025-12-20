@@ -1,4 +1,4 @@
-import type { User, Case, Hospital, Notification, CaseStatus } from '@/types';
+import type { User, Case, Hospital, Notification, CaseStatus, PaymentRecord } from '@/types';
 import { 
   addUser, addCase, addHospital, addNotification, 
   isDbInitialized, setDbInitialized, generateId 
@@ -16,7 +16,7 @@ const seedUsers: Omit<User, 'id'>[] = [
     username: 'admin',
     password: hashPassword('admin123'),
     role: 'admin',
-    name: 'Dr. Sarah Ahmed',
+    name: 'Sarah Ahmed',
     email: 'sarah.ahmed@sudind.sd',
     phone: '+249-912-345-678',
     passwordChanged: true,
@@ -86,45 +86,45 @@ const seedUsers: Omit<User, 'id'>[] = [
     createdAt: '2024-09-15',
     lastLogin: '2025-01-10',
   },
-  // Hospital Users
+  // Hospital Users (Agents handling hospital-related activities)
   {
     username: 'hospital.apollo',
     password: hashPassword('hospital123'),
     role: 'hospital',
-    name: 'Dr. Vikram Mehta',
+    name: 'Vikram Mehta',
     email: 'vikram@apollohospitals.com',
     phone: '+91-44-2829-0200',
     passwordChanged: true,
     createdBy: 'admin_001',
     createdAt: '2024-07-01',
     lastLogin: '2025-01-15',
-    hospitalId: 'hospital_001',
+    hospitalIds: ['hospital_001'],
   },
   {
     username: 'hospital.fortis',
     password: hashPassword('hospital123'),
     role: 'hospital',
-    name: 'Dr. Neha Gupta',
+    name: 'Neha Gupta',
     email: 'neha@fortishealthcare.com',
     phone: '+91-11-4277-6222',
     passwordChanged: true,
     createdBy: 'admin_001',
     createdAt: '2024-07-15',
     lastLogin: '2025-01-14',
-    hospitalId: 'hospital_002',
+    hospitalIds: ['hospital_002'],
   },
   {
     username: 'hospital.medanta',
     password: hashPassword('hospital123'),
     role: 'hospital',
-    name: 'Dr. Sanjay Kumar',
+    name: 'Sanjay Kumar',
     email: 'sanjay@medanta.org',
     phone: '+91-124-4141-414',
     passwordChanged: true,
     createdBy: 'admin_001',
     createdAt: '2024-08-01',
     lastLogin: '2025-01-13',
-    hospitalId: 'hospital_003',
+    hospitalIds: ['hospital_003'],
   },
   // Finance Users
   {
@@ -167,7 +167,7 @@ const seedHospitals: Hospital[] = [
     bedCapacity: 500,
     availableBeds: 45,
     accreditation: ['JCI', 'NABH', 'NABL'],
-    contactPerson: 'Dr. Vikram Mehta',
+    contactPerson: 'Vikram Mehta',
   },
   {
     id: 'hospital_002',
@@ -181,7 +181,7 @@ const seedHospitals: Hospital[] = [
     bedCapacity: 350,
     availableBeds: 28,
     accreditation: ['JCI', 'NABH'],
-    contactPerson: 'Dr. Neha Gupta',
+    contactPerson: 'Neha Gupta',
   },
   {
     id: 'hospital_003',
@@ -195,7 +195,7 @@ const seedHospitals: Hospital[] = [
     bedCapacity: 1250,
     availableBeds: 120,
     accreditation: ['JCI', 'NABH', 'NABL', 'CAP'],
-    contactPerson: 'Dr. Sanjay Kumar',
+    contactPerson: 'Sanjay Kumar',
   },
 ];
 
@@ -261,7 +261,209 @@ const seedClients: Omit<User, 'id'>[] = [
     createdAt: '2024-12-15',
     lastLogin: '2025-01-10',
   },
+  // Additional clients for Finance Dashboard data
+  {
+    username: 'client.hassan',
+    password: hashPassword('client123'),
+    role: 'client',
+    name: 'Hassan Mohamed Ali',
+    email: 'hassan.mohamed@email.com',
+    phone: '+249-918-123-461',
+    passwordChanged: true,
+    createdBy: 'agent_001',
+    createdAt: '2024-12-20',
+    lastLogin: '2025-01-09',
+  },
+  {
+    username: 'client.salma',
+    password: hashPassword('client123'),
+    role: 'client',
+    name: 'Salma Ibrahim Hassan',
+    email: 'salma.ibrahim@email.com',
+    phone: '+249-918-123-462',
+    passwordChanged: true,
+    createdBy: 'agent_002',
+    createdAt: '2024-12-25',
+    lastLogin: '2025-01-08',
+  },
+  {
+    username: 'client.khalid',
+    password: hashPassword('client123'),
+    role: 'client',
+    name: 'Khalid Osman Yousif',
+    email: 'khalid.osman@email.com',
+    phone: '+249-918-123-463',
+    passwordChanged: true,
+    createdBy: 'agent_003',
+    createdAt: '2024-12-30',
+    lastLogin: '2025-01-07',
+  },
+  {
+    username: 'client.noor',
+    password: hashPassword('client123'),
+    role: 'client',
+    name: 'Noor Ahmed Salim',
+    email: 'noor.ahmed@email.com',
+    phone: '+249-918-123-464',
+    passwordChanged: true,
+    createdBy: 'agent_004',
+    createdAt: '2025-01-05',
+    lastLogin: '2025-01-06',
+  },
 ];
+
+// Generate payment records for cases based on status
+const generatePaymentsForCase = (
+  status: CaseStatus,
+  index: number,
+  createdDate: Date
+): PaymentRecord[] => {
+  const payments: PaymentRecord[] = [];
+  const now = new Date();
+  
+  // Add payments based on case status
+  if (status === 'visa_processing_payments') {
+    // Visa processing payment - always add at least one payment
+    payments.push({
+      id: generateId('payment'),
+      type: 'visa',
+      amount: 150 + (index * 25), // $150-$300 range
+      currency: 'USD',
+      status: index % 3 === 0 ? 'pending' : index % 3 === 1 ? 'completed' : 'pending',
+      method: 'Bank Transfer',
+      reference: `VISA-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      processedBy: index % 3 === 1 ? 'finance_001' : undefined,
+      notes: index % 3 === 0 ? 'Awaiting verification' : 'Payment verified and processed',
+    });
+    
+    // Add a second payment for some cases
+    if (index % 2 === 0) {
+      payments.push({
+        id: generateId('payment'),
+        type: 'visa',
+        amount: 200 + (index * 20),
+        currency: 'USD',
+        status: 'pending',
+        method: 'Credit Card',
+        reference: `VISA-2-${Date.now()}-${index}`,
+        date: new Date(createdDate.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        notes: 'Additional visa processing fee',
+      });
+    }
+  }
+  
+  if (status === 'credit_payment_upload') {
+    // Credit payment - always add at least one payment
+    payments.push({
+      id: generateId('payment'),
+      type: 'treatment',
+      amount: 5000 + (index * 1000), // $5000-$12000 range
+      currency: 'USD',
+      status: index % 4 === 0 ? 'pending' : index % 4 === 1 ? 'completed' : index % 4 === 2 ? 'pending' : 'completed',
+      method: 'Credit Card',
+      reference: `CREDIT-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      processedBy: index % 4 === 1 || index % 4 === 3 ? 'finance_001' : undefined,
+      notes: index % 4 === 0 ? 'Pending credit verification' : 'Credit payment approved',
+    });
+    
+    // Add a second payment for some cases
+    if (index % 3 === 0) {
+      payments.push({
+        id: generateId('payment'),
+        type: 'treatment',
+        amount: 3000 + (index * 500),
+        currency: 'USD',
+        status: 'pending',
+        method: 'Wire Transfer',
+        reference: `CREDIT-2-${Date.now()}-${index}`,
+        date: new Date(createdDate.getTime() + 11 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        notes: 'Partial credit payment',
+      });
+    }
+  }
+  
+  // Add completed payments for cases in later stages
+  if (status === 'invoice_uploaded' || status === 'ticket_booking' || status === 'patient_manifest') {
+    // Visa payment (completed)
+    payments.push({
+      id: generateId('payment'),
+      type: 'visa',
+      amount: 200 + (index * 30),
+      currency: 'USD',
+      status: 'completed',
+      method: 'Bank Transfer',
+      reference: `VISA-COMP-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      processedBy: 'finance_001',
+      notes: 'Visa payment processed successfully',
+    });
+    
+    // Treatment payment (completed)
+    payments.push({
+      id: generateId('payment'),
+      type: 'treatment',
+      amount: 8000 + (index * 1500),
+      currency: 'USD',
+      status: 'completed',
+      method: 'Wire Transfer',
+      reference: `TREAT-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      processedBy: 'finance_001',
+      notes: 'Treatment payment received',
+    });
+  }
+  
+  // Add INR payments for some cases (mixed currency)
+  if (index % 3 === 0 && (status === 'visa_processing_payments' || status === 'credit_payment_upload')) {
+    payments.push({
+      id: generateId('payment'),
+      type: 'other',
+      amount: 50000 + (index * 5000), // INR amounts
+      currency: 'INR',
+      status: index % 2 === 0 ? 'completed' : 'pending',
+      method: 'UPI',
+      reference: `INR-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      processedBy: index % 2 === 0 ? 'finance_002' : undefined,
+      notes: index % 2 === 0 ? 'INR payment processed' : 'Awaiting INR payment verification',
+    });
+  }
+  
+  // Add travel payments for cases with tickets
+  if (status === 'ticket_booking' || status === 'patient_manifest') {
+    payments.push({
+      id: generateId('payment'),
+      type: 'travel',
+      amount: 1200 + (index * 200),
+      currency: 'USD',
+      status: 'completed',
+      method: 'Credit Card',
+      reference: `TRAVEL-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      processedBy: 'finance_001',
+      notes: 'Flight ticket payment processed',
+    });
+  }
+  
+  // Add failed payment for one case (for testing)
+  if (index === 2 && status === 'visa_processing_payments') {
+    payments.push({
+      id: generateId('payment'),
+      type: 'visa',
+      amount: 250,
+      currency: 'USD',
+      status: 'failed',
+      method: 'Bank Transfer',
+      reference: `FAILED-${Date.now()}-${index}`,
+      date: new Date(createdDate.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      notes: 'Payment failed due to insufficient funds. Retry required.',
+    });
+  }
+  
+  return payments;
+};
 
 // Generate sample cases
 const generateSeedCases = (userIds: { agents: string[]; clients: string[] }): Partial<Case>[] => {
@@ -281,6 +483,12 @@ const generateSeedCases = (userIds: { agents: string[]; clients: string[] }): Pa
     'case_closed',
     'frro_registration',
     'patient_manifest',
+    // Finance-related statuses for Finance Dashboard
+    'visa_processing_payments',
+    'credit_payment_upload',
+    'invoice_uploaded',
+    'visa_processing_payments', // Duplicate to ensure more cases
+    'credit_payment_upload', // Duplicate to ensure more cases
   ];
 
   const conditions = [
@@ -365,15 +573,19 @@ const generateSeedCases = (userIds: { agents: string[]; clients: string[] }): Pa
         estimatedDuration: '2-3 weeks',
         estimatedCost: 25000 + index * 5000,
         currency: 'USD',
-        doctorName: 'Dr. Specialist',
+        doctorName: 'Specialist',
         department: 'Specialty Department',
         notes: 'Patient requires pre-operative evaluation',
         createdAt: createdDate.toISOString(),
         createdBy: hospitalId,
       } : undefined,
-      payments: [],
+      payments: generatePaymentsForCase(status, index, createdDate),
       visa: {
         status: status === 'visa_approved' ? 'approved' : status.includes('visa') ? 'processing' : 'not_started',
+        applicationDate: status.includes('visa') ? new Date(createdDate.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
+        visaNumber: status === 'visa_approved' ? `V${1234567 + index}` : undefined,
+        issueDate: status === 'visa_approved' ? new Date(createdDate.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
+        expiryDate: status === 'visa_approved' ? new Date(createdDate.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
       },
       comments: [],
       activityLog: [
@@ -395,11 +607,258 @@ const generateSeedCases = (userIds: { agents: string[]; clients: string[] }): Pa
   });
 };
 
+// Add finance cases to existing database (for updating existing installations)
+export const addFinanceCases = async (): Promise<void> => {
+  const { getAllCases, addCase, getAllUsers } = await import('./storage');
+  const existingCases = await getAllCases();
+  
+  // Check if we already have finance cases with payments
+  const hasFinanceCases = existingCases.some(c => 
+    (c.status === 'visa_processing_payments' || 
+     c.status === 'credit_payment_upload' ||
+     c.status === 'invoice_uploaded') &&
+    c.payments.length > 0
+  );
+  
+  if (hasFinanceCases) {
+    console.log('Finance cases with payments already exist');
+    return;
+  }
+  
+  console.log('Adding finance cases to existing database...');
+  
+  // Get existing clients and agents
+  const allUsers = await getAllUsers();
+  const clients = allUsers.filter(u => u.role === 'client');
+  const agents = allUsers.filter(u => u.role === 'agent');
+  
+  if (clients.length === 0 || agents.length === 0) {
+    console.log('No clients or agents found. Cannot create finance cases.');
+    return;
+  }
+  
+  // Create finance-specific cases
+  const financeStatuses: CaseStatus[] = ['visa_processing_payments', 'credit_payment_upload', 'invoice_uploaded'];
+  const conditions = [
+    'Cardiac Surgery - Coronary Artery Bypass',
+    'Kidney Transplant',
+    'Spine Surgery - Lumbar Fusion',
+    'Oncology - Breast Cancer Treatment',
+    'Neurology - Brain Tumor Removal',
+  ];
+  
+  const now = new Date();
+  const agentIds = agents.map(a => a.id);
+  
+  // Create 5 finance cases with payments
+  for (let i = 0; i < Math.min(5, clients.length); i++) {
+    const client = clients[i];
+    const agentId = agentIds[i % agentIds.length];
+    const status = financeStatuses[i % financeStatuses.length];
+    const createdDate = new Date(now.getTime() - (10 - i) * 24 * 60 * 60 * 1000);
+    
+    const caseData: Case = {
+      id: `case_finance_${String(i + 1).padStart(3, '0')}`,
+      clientId: client.id,
+      agentId,
+      status,
+      statusHistory: [
+        {
+          status: 'new',
+          timestamp: createdDate.toISOString(),
+          by: agentId,
+          byName: agents.find(a => a.id === agentId)?.name || 'Agent',
+          note: 'Case created',
+        },
+        {
+          status,
+          timestamp: new Date(createdDate.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          by: 'admin_001',
+          byName: 'Admin',
+          note: `Moved to ${status}`,
+        },
+      ],
+      documents: [
+        {
+          id: generateId('doc'),
+          type: 'passport_front',
+          name: 'passport_front.pdf',
+          uploadedBy: agentId,
+          uploadedAt: createdDate.toISOString(),
+          extractedText: 'Passport details extracted...',
+          size: 1024000,
+          mimeType: 'application/pdf',
+        },
+        {
+          id: generateId('doc'),
+          type: 'medical_reports',
+          name: 'medical_report.pdf',
+          uploadedBy: agentId,
+          uploadedAt: createdDate.toISOString(),
+          size: 2048000,
+          mimeType: 'application/pdf',
+        },
+      ],
+      clientInfo: {
+        name: client.name,
+        dob: '1985-05-15',
+        passport: `SD${1234567 + i}`,
+        nationality: 'Sudanese',
+        condition: conditions[i % conditions.length],
+        phone: client.phone,
+        email: client.email,
+        address: 'Khartoum, Sudan',
+        emergencyContact: 'Family Member',
+        emergencyPhone: '+249-918-999-999',
+      },
+      attenderInfo: {
+        name: 'Family Attender',
+        relationship: 'Spouse',
+        passport: `SD${7654321 + i}`,
+        phone: '+249-918-888-888',
+        email: 'attender@email.com',
+      },
+      assignedHospital: 'hospital_001',
+      treatmentPlan: {
+        id: generateId('plan'),
+        diagnosis: conditions[i % conditions.length],
+        proposedTreatment: 'Comprehensive treatment plan',
+        estimatedDuration: '2-3 weeks',
+        estimatedCost: 25000 + i * 5000,
+        currency: 'USD',
+        doctorName: 'Specialist',
+        department: 'Specialty Department',
+        notes: 'Patient requires treatment',
+        createdAt: createdDate.toISOString(),
+        createdBy: 'hospital_001',
+      },
+      payments: generatePaymentsForCase(status, i, createdDate),
+      visa: {
+        status: status.includes('visa') ? 'processing' : 'not_started',
+        applicationDate: status.includes('visa') ? new Date(createdDate.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
+      },
+      comments: [],
+      activityLog: [
+        {
+          id: generateId('log'),
+          caseId: '',
+          userId: agentId,
+          userName: agents.find(a => a.id === agentId)?.name || 'Agent',
+          userRole: 'agent',
+          action: 'Case Created',
+          details: 'New case created for patient',
+          timestamp: createdDate.toISOString(),
+        },
+      ],
+      createdAt: createdDate.toISOString(),
+      updatedAt: now.toISOString(),
+      priority: i % 2 === 0 ? 'high' : 'medium',
+    };
+    
+    // Add payment activity logs
+    if (caseData.payments && caseData.payments.length > 0) {
+      const financeUsers = seedUsers.filter(u => u.role === 'finance');
+      caseData.payments.forEach((payment) => {
+        const financeUser = financeUsers.find(u => 
+          payment.processedBy === 'finance_001' ? u.username.includes('finance.omar') :
+          payment.processedBy === 'finance_002' ? u.username.includes('finance.fatima') :
+          u.username.includes('finance.omar')
+        );
+        caseData.activityLog.push({
+          id: generateId('log'),
+          caseId: caseData.id,
+          userId: payment.processedBy || 'finance_001',
+          userName: financeUser?.name || 'Finance Admin',
+          userRole: 'finance',
+          action: payment.status === 'completed' ? 'Payment Processed' : payment.status === 'failed' ? 'Payment Failed' : 'Payment Created',
+          details: `${payment.type} payment of ${payment.currency} ${payment.amount} - ${payment.status}`,
+          timestamp: payment.date + 'T12:00:00.000Z',
+        });
+      });
+    }
+    
+    // Update activity log case IDs
+    caseData.activityLog = caseData.activityLog.map(log => ({
+      ...log,
+      caseId: caseData.id,
+    }));
+    
+    await addCase(caseData);
+  }
+  
+  console.log('Finance cases added successfully');
+};
+
+// Update existing cases with payments if they're in finance statuses
+export const updateExistingCasesWithPayments = async (): Promise<void> => {
+  const { getAllCases, updateCase } = await import('./storage');
+  const existingCases = await getAllCases();
+  
+  // Find cases in finance statuses without payments
+  const casesNeedingPayments = existingCases.filter(c => 
+    (c.status === 'visa_processing_payments' || 
+     c.status === 'credit_payment_upload' ||
+     c.status === 'invoice_uploaded' ||
+     c.status === 'ticket_booking' ||
+     c.status === 'patient_manifest') &&
+    c.payments.length === 0
+  );
+  
+  if (casesNeedingPayments.length === 0) {
+    return;
+  }
+  
+  console.log(`Updating ${casesNeedingPayments.length} existing cases with payment data...`);
+  
+  for (const caseItem of casesNeedingPayments) {
+    const createdDate = new Date(caseItem.createdAt);
+    const index = parseInt(caseItem.id.replace(/\D/g, '')) || 0;
+    const payments = generatePaymentsForCase(caseItem.status, index, createdDate);
+    
+    if (payments.length > 0) {
+      const updatedCase = {
+        ...caseItem,
+        payments,
+      };
+      
+      // Add payment activity logs
+      if (updatedCase.activityLog) {
+        const financeUsers = seedUsers.filter(u => u.role === 'finance');
+        payments.forEach((payment) => {
+          const financeUser = financeUsers.find(u => 
+            payment.processedBy === 'finance_001' ? u.username.includes('finance.omar') :
+            payment.processedBy === 'finance_002' ? u.username.includes('finance.fatima') :
+            u.username.includes('finance.omar')
+          );
+          updatedCase.activityLog.push({
+            id: generateId('log'),
+            caseId: updatedCase.id,
+            userId: payment.processedBy || 'finance_001',
+            userName: financeUser?.name || 'Finance Admin',
+            userRole: 'finance',
+            action: payment.status === 'completed' ? 'Payment Processed' : payment.status === 'failed' ? 'Payment Failed' : 'Payment Created',
+            details: `${payment.type} payment of ${payment.currency} ${payment.amount} - ${payment.status}`,
+            timestamp: payment.date + 'T12:00:00.000Z',
+          });
+        });
+      }
+      
+      await updateCase(updatedCase);
+    }
+  }
+  
+  console.log('Existing cases updated with payment data');
+};
+
 // Initialize seed data
 export const initializeSeedData = async (): Promise<void> => {
   const initialized = await isDbInitialized();
   if (initialized) {
     console.log('Database already initialized');
+    // Try to add finance cases if they don't exist
+    await addFinanceCases();
+    // Update existing cases with payments
+    await updateExistingCasesWithPayments();
     return;
   }
 
@@ -454,6 +913,29 @@ export const initializeSeedData = async (): Promise<void> => {
         ...log,
         caseId,
       }));
+      
+      // Add payment activity logs
+      if (caseData.payments && caseData.payments.length > 0) {
+        // Get finance users for activity log
+        const financeUsers = seedUsers.filter(u => u.role === 'finance');
+        caseData.payments.forEach((payment) => {
+          const financeUser = financeUsers.find(u => 
+            payment.processedBy === 'finance_001' ? u.username.includes('finance.omar') :
+            payment.processedBy === 'finance_002' ? u.username.includes('finance.fatima') :
+            u.username.includes('finance.omar')
+          );
+          caseData.activityLog!.push({
+            id: generateId('log'),
+            caseId,
+            userId: payment.processedBy || 'finance_001',
+            userName: financeUser?.name || 'Finance Admin',
+            userRole: 'finance',
+            action: payment.status === 'completed' ? 'Payment Processed' : payment.status === 'failed' ? 'Payment Failed' : 'Payment Created',
+            details: `${payment.type} payment of ${payment.currency} ${payment.amount} - ${payment.status}`,
+            timestamp: payment.date + 'T12:00:00.000Z',
+          });
+        });
+      }
     }
 
     await addCase({

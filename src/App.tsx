@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { DataProvider } from "@/contexts/DataContext";
 import Login from "./pages/Login";
+import PasswordReset from "./pages/PasswordReset";
 import MainLayout from "./components/layout/MainLayout";
 import Dashboard from "./pages/Dashboard";
 import CasesList from "./pages/cases/CasesList";
@@ -27,13 +28,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { isAuthenticated, isLoading, user } = useAuth();
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-pulse-soft text-muted-foreground">Loading...</div></div>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // Don't redirect here - let Login page handle password change requirement
-  // This prevents infinite loops
+  // Redirect to password reset if user hasn't changed password
+  if (isAuthenticated && user && !user.passwordChanged) {
+    return <Navigate to="/reset-password" replace />;
+  }
   return <>{children}</>;
 };
 
 const AppRoutes: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   
   // Show loading while auth is initializing
   if (isLoading) {
@@ -46,7 +49,8 @@ const AppRoutes: React.FC = () => {
   
   return (
     <Routes>
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/login" element={isAuthenticated && user?.passwordChanged ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/reset-password" element={<PasswordReset />} />
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />

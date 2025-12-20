@@ -15,7 +15,7 @@ export interface User {
   createdAt: string;
   lastLogin: string;
   avatar?: string;
-  hospitalId?: string; // For hospital users
+  hospitalIds?: string[]; // For hospital users - can handle multiple hospitals
 }
 
 // Case Status Types

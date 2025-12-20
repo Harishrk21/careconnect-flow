@@ -49,6 +49,26 @@ import {
   Loader2,
   Eye,
   Download,
+  Play,
+  Pause,
+  X,
+  Check,
+  FileCheck,
+  FileX,
+  ArrowRight,
+  Zap,
+  Shield,
+  Briefcase,
+  Receipt,
+  Ticket,
+  UserCheck,
+  ClipboardCheck,
+  Pill,
+  LogOut,
+  Ban,
+  RefreshCw,
+  Info,
+  Sparkles,
 } from 'lucide-react';
 import { 
   STATUS_LABELS, 
@@ -63,6 +83,8 @@ import {
 } from '@/types';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import ActivityTimeline from '@/components/cases/ActivityTimeline';
+import { getAvailableDocumentTypes, getRequiredDocuments } from '@/lib/documentPermissions';
 
 const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -77,6 +99,7 @@ const CaseDetail: React.FC = () => {
   const [statusNote, setStatusNote] = useState('');
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CaseStatus | null>(null);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | ''>('');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,7 +176,7 @@ const CaseDetail: React.FC = () => {
       setLoading(true);
       try {
         console.log('Loading case with ID:', id);
-        const data = await getCase(id);
+      const data = await getCase(id);
         console.log('Case data loaded:', data ? 'Found' : 'Not found', data);
         if (data) {
           setCaseData(data);
@@ -165,7 +188,7 @@ const CaseDetail: React.FC = () => {
         console.error('Error loading case:', error);
         setCaseData(null);
       } finally {
-        setLoading(false);
+      setLoading(false);
       }
     };
     loadCase();
@@ -316,9 +339,10 @@ const CaseDetail: React.FC = () => {
 
   const hospital = hospitals.find(h => h.id === caseData.assignedHospital);
   
-  // Helper to check if case is assigned to current hospital user
+  // Helper to check if case is assigned to current hospital user (supports multiple hospitals)
   const isAssignedToCurrentHospital = user?.role === 'hospital' && 
-    caseData.assignedHospital === user.hospitalId;
+    caseData.assignedHospital && 
+    (user.hospitalIds || []).includes(caseData.assignedHospital);
   
   // Helper to check if case belongs to current agent
   const isAssignedToCurrentAgent = user?.role === 'agent' && 
@@ -343,12 +367,16 @@ const CaseDetail: React.FC = () => {
 
   // Get available document types (not already uploaded)
   const uploadedDocTypes = caseData.documents.map(d => d.type);
-  const availableDocTypes = Object.keys(DOCUMENT_TYPE_LABELS).filter(
-    type => !uploadedDocTypes.includes(type as DocumentType)
-  ) as DocumentType[];
+  // Get available document types based on role and status
+  const availableDocTypes = user && caseData
+    ? getAvailableDocumentTypes(user.role, caseData.status, uploadedDocTypes)
+    : [];
 
-  // Check required documents
-  const missingRequired = REQUIRED_DOCUMENTS.filter(
+  // Check required documents based on role and status
+  const requiredDocs = user && caseData
+    ? getRequiredDocuments(user.role, caseData.status)
+    : [];
+  const missingRequired = requiredDocs.filter(
     type => !uploadedDocTypes.includes(type)
   );
 
@@ -565,7 +593,127 @@ const CaseDetail: React.FC = () => {
 
   const availableStatuses = getAvailableStatuses();
 
+  // Action icons mapping for professional UI
+  const getActionIcon = (status: CaseStatus) => {
+    const iconMap: Record<CaseStatus, React.ReactNode> = {
+      new: <FileText className="w-4 h-4" />,
+      case_agent_review: <FileCheck className="w-4 h-4" />,
+      admin_review: <Shield className="w-4 h-4" />,
+      assigned_to_hospital: <Building2 className="w-4 h-4" />,
+      hospital_review: <Eye className="w-4 h-4" />,
+      case_accepted: <CheckCircle2 className="w-4 h-4" />,
+      case_rejected: <X className="w-4 h-4" />,
+      treatment_plan_uploaded: <Stethoscope className="w-4 h-4" />,
+      pass_travel_documentation: <FileCheck className="w-4 h-4" />,
+      visa_processing_documents: <FileText className="w-4 h-4" />,
+      visa_processing_payments: <CreditCard className="w-4 h-4" />,
+      visa_approved: <CheckCircle2 className="w-4 h-4" />,
+      visa_rejected: <X className="w-4 h-4" />,
+      visa_reapply: <RefreshCw className="w-4 h-4" />,
+      visa_terminate: <Ban className="w-4 h-4" />,
+      visa_copy_uploaded: <Upload className="w-4 h-4" />,
+      credit_payment_upload: <Receipt className="w-4 h-4" />,
+      invoice_uploaded: <FileText className="w-4 h-4" />,
+      ticket_booking: <Ticket className="w-4 h-4" />,
+      patient_manifest: <Users className="w-4 h-4" />,
+      admit_format_uploaded: <ClipboardCheck className="w-4 h-4" />,
+      frro_registration: <Shield className="w-4 h-4" />,
+      treatment_in_progress: <Activity className="w-4 h-4" />,
+      final_report_medicine: <Pill className="w-4 h-4" />,
+      discharge_process: <LogOut className="w-4 h-4" />,
+      case_closed: <CheckCircle2 className="w-4 h-4" />,
+    };
+    return iconMap[status] || <ArrowRight className="w-4 h-4" />;
+  };
+
+  // Action descriptions for better UX
+  const getActionDescription = (status: CaseStatus): string => {
+    const descriptions: Record<CaseStatus, string> = {
+      new: 'Start reviewing and uploading required documents',
+      case_agent_review: 'Review case details and ensure all documents are uploaded',
+      admin_review: 'Admin will validate the case and assign to hospital agent',
+      assigned_to_hospital: 'Case has been assigned to a hospital agent for review',
+      hospital_review: 'Hospital agent is reviewing the case',
+      case_accepted: 'Hospital agent has accepted the case',
+      case_rejected: 'Case has been rejected and returned for review',
+      treatment_plan_uploaded: 'Treatment plan has been uploaded by hospital',
+      pass_travel_documentation: 'Travel documentation has been approved',
+      visa_processing_documents: 'Visa documents are being processed',
+      visa_processing_payments: 'Visa payment processing is in progress',
+      visa_approved: 'Visa has been approved',
+      visa_rejected: 'Visa application has been rejected',
+      visa_reapply: 'Visa application will be resubmitted',
+      visa_terminate: 'Case has been terminated',
+      visa_copy_uploaded: 'Visa copy has been uploaded to the system',
+      credit_payment_upload: 'Credit payment documents are being processed',
+      invoice_uploaded: 'Hospital invoice has been uploaded',
+      ticket_booking: 'Flight tickets are being booked',
+      patient_manifest: 'Patient arrival details are being prepared',
+      admit_format_uploaded: 'Hospital admission format has been uploaded',
+      frro_registration: 'FRRO registration is in progress',
+      treatment_in_progress: 'Patient is currently undergoing treatment',
+      final_report_medicine: 'Final medical report and medicines are ready',
+      discharge_process: 'Patient discharge process is being completed',
+      case_closed: 'Case has been successfully closed',
+    };
+    return descriptions[status] || 'Proceed to next stage';
+  };
+
+  // Action categories for better organization
+  const getActionCategory = (status: CaseStatus): { name: string; color: string; icon: React.ReactNode } => {
+    if (status.includes('review') || status === 'new') {
+      return { name: 'Review', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20', icon: <Eye className="w-3 h-3" /> };
+    }
+    if (status.includes('rejected') || status.includes('terminate')) {
+      return { name: 'Rejection', color: 'bg-red-500/10 text-red-600 border-red-500/20', icon: <X className="w-3 h-3" /> };
+    }
+    if (status.includes('accepted') || status.includes('approved') || status === 'case_closed') {
+      return { name: 'Approval', color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: <CheckCircle2 className="w-3 h-3" /> };
+    }
+    if (status.includes('visa') || status.includes('payment') || status.includes('ticket')) {
+      return { name: 'Processing', color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', icon: <Zap className="w-3 h-3" /> };
+    }
+    if (status.includes('treatment') || status.includes('discharge') || status.includes('medicine')) {
+      return { name: 'Medical', color: 'bg-teal-500/10 text-teal-600 border-teal-500/20', icon: <Stethoscope className="w-3 h-3" /> };
+    }
+    return { name: 'Action', color: 'bg-gray-500/10 text-gray-600 border-gray-500/20', icon: <ArrowRight className="w-3 h-3" /> };
+  };
+
+  // Check if action requires special conditions
+  const getActionRequirements = (status: CaseStatus): string[] => {
+    const requirements: string[] = [];
+    
+    if (status === 'case_agent_review' && missingRequired.length > 0) {
+      requirements.push(`${missingRequired.length} required document(s) missing`);
+    }
+    
+    if (status === 'treatment_plan_uploaded' && !caseData?.treatmentPlan) {
+      requirements.push('Treatment plan must be uploaded first');
+    }
+    
+    if (status === 'assigned_to_hospital' && !caseData?.assignedHospital) {
+      requirements.push('Hospital agent must be assigned first');
+    }
+    
+    if (status === 'visa_copy_uploaded' && caseData?.status !== 'visa_approved') {
+      requirements.push('Visa must be approved first');
+    }
+    
+    return requirements;
+  };
+
   const handleStatusChange = async (newStatus: CaseStatus) => {
+    // Check requirements before opening dialog
+    const requirements = getActionRequirements(newStatus);
+    if (requirements.length > 0) {
+      toast({
+        title: 'Action Requirements Not Met',
+        description: requirements.join('. '),
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setPendingStatus(newStatus);
     setIsStatusDialogOpen(true);
   };
@@ -601,6 +749,7 @@ const CaseDetail: React.FC = () => {
       return;
     }
     
+    setIsSavingStatus(true);
     try {
       // Handle special status transitions that require additional data
       const updates: Partial<Case> = {};
@@ -643,7 +792,7 @@ const CaseDetail: React.FC = () => {
         };
       }
       
-      // Update status
+      // Update status with real-time feedback
       await updateCaseStatus(id, pendingStatus, statusNote);
       
       // Apply additional updates if any
@@ -654,19 +803,22 @@ const CaseDetail: React.FC = () => {
       await refreshCase();
       
       toast({
-        title: 'Status Updated',
-        description: `Case status changed to ${STATUS_LABELS[pendingStatus]}`,
+        title: 'Status Updated Successfully',
+        description: `Case status changed from "${STATUS_LABELS[caseData.status]}" to "${STATUS_LABELS[pendingStatus]}"`,
       });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update status',
-        variant: 'destructive',
-      });
-    } finally {
+      
+      // Close dialog after success
       setIsStatusDialogOpen(false);
       setPendingStatus(null);
       setStatusNote('');
+    } catch (error) {
+      toast({
+        title: 'Error Updating Status',
+        description: error instanceof Error ? error.message : 'Failed to update status. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSavingStatus(false);
     }
   };
 
@@ -723,10 +875,10 @@ const CaseDetail: React.FC = () => {
       extractedData.patientName = caseData?.clientInfo.name || 'Patient Name';
       extractedData.condition = caseData?.clientInfo.condition || 'Medical Condition';
       extractedData.dob = caseData?.clientInfo.dob || '1985-05-15';
-      extractedData.doctorName = 'Dr. Specialist';
+      extractedData.doctorName = 'Specialist';
       extractedData.date = new Date().toISOString().split('T')[0];
       extractedData.findings = 'Medical findings and test results extracted from document.';
-      return `MEDICAL DOCUMENT EXTRACTION RESULTS:\n\nPatient Name: ${extractedData.patientName}\nDate of Birth: ${extractedData.dob}\nCondition: ${extractedData.condition}\nDoctor: ${extractedData.doctorName}\nDate: ${extractedData.date}\n\nFindings:\n${extractedData.findings}\n\nDocument Type: ${DOCUMENT_TYPE_LABELS[docType]}\nFile Name: ${file.name}\nFile Size: ${(file.size / 1024).toFixed(2)} KB\nExtracted At: ${new Date().toISOString()}`;
+      return `MEDICAL DOCUMENT EXTRACTION RESULTS:\n\nPatient Name: ${extractedData.patientName}\nDate of Birth: ${extractedData.dob}\nCondition: ${extractedData.condition}\nMedical Specialist: ${extractedData.doctorName}\nDate: ${extractedData.date}\n\nFindings:\n${extractedData.findings}\n\nDocument Type: ${DOCUMENT_TYPE_LABELS[docType]}\nFile Name: ${file.name}\nFile Size: ${(file.size / 1024).toFixed(2)} KB\nExtracted At: ${new Date().toISOString()}`;
     } else {
       return `DOCUMENT EXTRACTION RESULTS:\n\nDocument Type: ${DOCUMENT_TYPE_LABELS[docType]}\nFile Name: ${file.name}\nFile Size: ${(file.size / 1024).toFixed(2)} KB\nMIME Type: ${file.type}\nExtracted At: ${new Date().toISOString()}\n\nContent extracted successfully.`;
     }
@@ -1362,8 +1514,31 @@ const CaseDetail: React.FC = () => {
     }
   };
 
-  const canEditDocuments = user?.role === 'agent' && 
-    (caseData.status === 'new' || caseData.status === 'case_agent_review');
+  // Document upload permissions based on role and status
+  const canEditDocuments = (() => {
+    if (!user || !caseData) return false;
+    
+    // Get available document types for this role and status
+    const availableDocs = getAvailableDocumentTypes(
+      user.role,
+      caseData.status,
+      uploadedDocTypes
+    );
+    
+    // Can edit if there are available documents to upload
+    if (availableDocs.length > 0) {
+      // Additional checks for specific roles
+      if (user.role === 'hospital') {
+        return isAssignedToCurrentHospital;
+      }
+      if (user.role === 'agent') {
+        return isAssignedToCurrentAgent;
+      }
+      return true; // Admin, finance can upload if documents are available
+    }
+    
+    return false;
+  })();
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1470,77 +1645,195 @@ const CaseDetail: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Actions Panel (for non-client users) */}
+      {/* Professional Actions Panel (for non-client users) */}
       {user?.role !== 'client' && (
-        <Card className="card-elevated border-primary/20 bg-primary/5">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2 text-foreground">
-              <Activity className="w-5 h-5 text-primary" />
-              Available Actions
-            </CardTitle>
-            <CardDescription>
-              {availableStatuses.length > 0 
-                ? `You can perform ${availableStatuses.length} action(s) on this case`
-                : 'No actions available at this stage. Waiting for other roles to complete their tasks.'}
-            </CardDescription>
+        <Card className="card-elevated border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background shadow-lg">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md">
+                  <Sparkles className="w-5 h-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl flex items-center gap-2 text-foreground">
+                    Available Actions
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {availableStatuses.length > 0 
+                      ? `${availableStatuses.length} action${availableStatuses.length > 1 ? 's' : ''} available for this case`
+                      : 'No actions available. Waiting for other roles to complete their tasks.'}
+                  </CardDescription>
+                </div>
+              </div>
+              {availableStatuses.length > 0 && (
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                  <Activity className="w-3 h-3 mr-1" />
+                  Active
+                </Badge>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {availableStatuses.length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {availableStatuses.map((status) => {
-                    const isRejection = status === 'case_rejected' || status === 'visa_rejected' || status === 'visa_terminate';
+              <div className="space-y-4">
+                {/* Group actions by category */}
+                {(() => {
+                  const groupedActions = availableStatuses.reduce((acc, status) => {
+                    const category = getActionCategory(status);
+                    if (!acc[category.name]) {
+                      acc[category.name] = [];
+                    }
+                    acc[category.name].push(status);
+                    return acc;
+                  }, {} as Record<string, CaseStatus[]>);
+
+                  return Object.entries(groupedActions).map(([categoryName, statuses]) => {
+                    const category = getActionCategory(statuses[0]);
                     return (
-                      <Button
-                        key={status}
-                        onClick={() => handleStatusChange(status)}
-                        variant={isRejection ? 'destructive' : 'default'}
-                        className={isRejection ? '' : 'bg-gradient-primary hover:opacity-90'}
-                        size="sm"
-                      >
-                        <ChevronRight className="w-4 h-4 mr-1" />
-                        {STATUS_LABELS[status]}
-                      </Button>
+                      <div key={categoryName} className="space-y-2">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={cn('px-2 py-1 rounded-md border flex items-center gap-1', category.color)}>
+                            {category.icon}
+                            <span className="text-xs font-medium">{categoryName}</span>
+                          </div>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {statuses.map((status) => {
+                            const isRejection = status === 'case_rejected' || status === 'visa_rejected' || status === 'visa_terminate';
+                            const requirements = getActionRequirements(status);
+                            const canProceed = requirements.length === 0;
+                            
+                            return (
+                              <div
+                                key={status}
+                                className={cn(
+                                  'group relative p-4 rounded-xl border-2 transition-all duration-300',
+                                  canProceed
+                                    ? isRejection
+                                      ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50 hover:bg-red-500/10 cursor-pointer'
+                                      : 'border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10 cursor-pointer hover:shadow-lg'
+                                    : 'border-muted bg-muted/30 opacity-60 cursor-not-allowed',
+                                  'animate-fade-in'
+                                )}
+                                onClick={() => canProceed && handleStatusChange(status)}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className={cn(
+                                    'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110',
+                                    canProceed
+                                      ? isRejection
+                                        ? 'bg-red-500/20 text-red-600'
+                                        : 'bg-primary/20 text-primary'
+                                      : 'bg-muted text-muted-foreground'
+                                  )}>
+                                    {getActionIcon(status)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className={cn(
+                                        'font-semibold text-sm',
+                                        canProceed ? 'text-foreground' : 'text-muted-foreground'
+                                      )}>
+                                        {STATUS_LABELS[status]}
+                                      </h4>
+                                      {!canProceed && (
+                                        <Info className="w-3.5 h-3.5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                      {getActionDescription(status)}
+                                    </p>
+                                    {requirements.length > 0 && (
+                                      <div className="space-y-1">
+                                        {requirements.map((req, idx) => (
+                                          <div key={idx} className="flex items-center gap-1.5 text-xs text-medical-warning">
+                                            <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                                            <span>{req}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {canProceed && (
+                                      <div className="flex items-center gap-1 mt-2 text-xs text-primary">
+                                        <span>Click to proceed</span>
+                                        <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {canProceed && (
+                                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className={cn(
+                                      'w-2 h-2 rounded-full animate-pulse',
+                                      isRejection ? 'bg-red-500' : 'bg-primary'
+                                    )} />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
-                  })}
-                </div>
+                  });
+                })()}
                 
                 {/* Hospital Assignment (Admin only) - Hospital refers to Sudaind's hospital-related agent */}
                 {user?.role === 'admin' && 
                  (caseData.status === 'admin_review' || caseData.status === 'case_rejected') && 
                  !caseData.assignedHospital && (
-                  <div className="flex items-center gap-2 pt-2 border-t border-border">
-                    <Select value={selectedHospital} onValueChange={setSelectedHospital}>
-                      <SelectTrigger className="w-[250px]">
-                        <Building2 className="w-4 h-4 mr-2" />
-                        <SelectValue placeholder="Select Hospital Agent to Assign" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
-                        {hospitals.map((h) => (
-                          <SelectItem key={h.id} value={h.id}>
-                            {h.name} - {h.city}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button 
-                      onClick={handleAssignHospital} 
-                      disabled={!selectedHospital}
-                      className="bg-gradient-primary"
-                    >
-                      Assign Hospital Agent
-                    </Button>
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Building2 className="w-5 h-5 text-primary" />
+                        <h4 className="font-semibold text-sm text-foreground">Assign Hospital Agent</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select value={selectedHospital} onValueChange={setSelectedHospital}>
+                          <SelectTrigger className="flex-1 bg-background">
+                            <Building2 className="w-4 h-4 mr-2" />
+                            <SelectValue placeholder="Select Hospital Agent to Assign" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-popover border-border">
+                            {hospitals.map((h) => (
+                              <SelectItem key={h.id} value={h.id}>
+                                {h.name} - {h.city}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          onClick={handleAssignHospital} 
+                          disabled={!selectedHospital}
+                          className="bg-gradient-primary hover:opacity-90 shadow-md"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Assign
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-4 text-muted-foreground">
-                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Waiting for next action...</p>
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Clock className="w-8 h-8 text-muted-foreground opacity-50 animate-pulse" />
+                </div>
+                <p className="text-sm font-medium text-foreground mb-1">Waiting for Next Action</p>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Other team members need to complete their tasks before you can proceed.
+                </p>
                 {user?.role === 'agent' && caseData.status === 'case_agent_review' && missingRequired.length > 0 && (
-                  <p className="text-xs mt-2 text-medical-warning">
-                    Upload all required documents to proceed
-                  </p>
+                  <div className="mt-4 p-3 bg-medical-warning/10 border border-medical-warning/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-medical-warning">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="font-medium">Action Required:</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Upload all {missingRequired.length} required document(s) to proceed
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -1548,60 +1841,163 @@ const CaseDetail: React.FC = () => {
         </Card>
       )}
 
-      {/* Status Change Dialog */}
-      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-md">
+      {/* Enhanced Status Change Dialog */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={(open) => {
+        setIsStatusDialogOpen(open);
+        if (!open) {
+          setStatusNote('');
+          setPendingStatus(null);
+        }
+      }}>
+        <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Confirm Status Change</DialogTitle>
-            <DialogDescription>
-              <div className="space-y-2 mt-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">From:</span>
-                  <Badge variant="outline" className={getStatusBadgeClass(caseData.status)}>
-                    {STATUS_LABELS[caseData.status]}
-                  </Badge>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center">
+                {pendingStatus && getActionIcon(pendingStatus)}
+              </div>
+              <div>
+                <DialogTitle className="text-foreground text-lg">Confirm Status Change</DialogTitle>
+                <DialogDescription className="mt-1">
+                  Review the status transition before confirming
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Status Transition Visualization */}
+            <div className="relative">
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    'bg-muted text-muted-foreground'
+                  )}>
+                    {getActionIcon(caseData.status)}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Current Status</p>
+                    <Badge variant="outline" className={getStatusBadgeClass(caseData.status)}>
+                      {STATUS_LABELS[caseData.status]}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">To:</span>
-                  <Badge variant="outline" className={pendingStatus ? getStatusBadgeClass(pendingStatus) : ''}>
-                    {pendingStatus && STATUS_LABELS[pendingStatus]}
-                  </Badge>
+                <ArrowRight className="w-5 h-5 text-muted-foreground mx-4" />
+                <div className="flex items-center gap-3 flex-1">
+                  <div className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    pendingStatus && (pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate')
+                      ? 'bg-red-500/20 text-red-600'
+                      : 'bg-primary/20 text-primary'
+                  )}>
+                    {pendingStatus && getActionIcon(pendingStatus)}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">New Status</p>
+                    <Badge 
+                      variant="outline" 
+                      className={pendingStatus ? getStatusBadgeClass(pendingStatus) : ''}
+                    >
+                      {pendingStatus && STATUS_LABELS[pendingStatus]}
+                    </Badge>
+                  </div>
                 </div>
-                {(pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate') && (
-                  <div className="p-2 bg-medical-warning/10 border border-medical-warning/20 rounded-lg mt-2">
-                    <p className="text-xs text-medical-warning flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
-                      This action will mark the case as rejected
+              </div>
+            </div>
+
+            {/* Action Description */}
+            {pendingStatus && (
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                <p className="text-sm text-foreground">
+                  <strong>Action:</strong> {getActionDescription(pendingStatus)}
+                </p>
+              </div>
+            )}
+
+            {/* Warning for Rejection Actions */}
+            {(pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate') && (
+              <div className="p-4 bg-red-500/10 border-2 border-red-500/30 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-600 mb-1">Warning: Critical Action</p>
+                    <p className="text-xs text-muted-foreground">
+                      This action will {pendingStatus === 'visa_terminate' ? 'terminate' : 'reject'} the case. 
+                      Please provide a reason below.
                     </p>
                   </div>
-                )}
+                </div>
               </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">
-                Add a note (optional)
-              </label>
+            )}
+
+            {/* Status Note Input */}
+            <div className="space-y-2">
+              <Label htmlFor="statusNote" className="text-sm font-medium">
+                {pendingStatus && (pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate')
+                  ? 'Reason for Rejection/Termination *'
+                  : 'Optional Note'}
+              </Label>
               <Textarea
-                placeholder="Explain the reason for this status change..."
+                id="statusNote"
                 value={statusNote}
                 onChange={(e) => setStatusNote(e.target.value)}
-                className="min-h-[100px]"
+                placeholder={pendingStatus && (pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate')
+                  ? 'Please provide a reason for this action...'
+                  : 'Add any notes about this status change...'}
+                className="min-h-[80px] resize-none"
+                rows={3}
               />
+              <p className="text-xs text-muted-foreground">
+                This note will be recorded in the case history
+              </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsStatusDialogOpen(false);
+                setStatusNote('');
+                setPendingStatus(null);
+              }}
+              disabled={isSavingStatus}
+              className="flex-1"
+            >
+              <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
             <Button 
-              onClick={confirmStatusChange} 
-              className={pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate' 
-                ? 'bg-destructive hover:bg-destructive/90' 
-                : 'bg-gradient-primary'}
+              onClick={confirmStatusChange}
+              disabled={
+                isSavingStatus || 
+                (pendingStatus && (pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate') && !statusNote.trim())
+              }
+              className={cn(
+                'flex-1 shadow-md',
+                pendingStatus && (pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate')
+                  ? 'bg-destructive hover:bg-destructive/90'
+                  : 'bg-gradient-primary hover:opacity-90'
+              )}
             >
-              Confirm Change
+              {isSavingStatus ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  {pendingStatus && (pendingStatus === 'case_rejected' || pendingStatus === 'visa_rejected' || pendingStatus === 'visa_terminate') ? (
+                    <>
+                      <X className="w-4 h-4 mr-2" />
+                      Confirm Rejection
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Confirm Change
+                    </>
+                  )}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1635,12 +2031,12 @@ const CaseDetail: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="doctorName">Doctor Name</Label>
+                <Label htmlFor="doctorName">Medical Specialist Name</Label>
                 <Input
                   id="doctorName"
                   value={treatmentPlanData.doctorName}
                   onChange={(e) => setTreatmentPlanData({ ...treatmentPlanData, doctorName: e.target.value })}
-                  placeholder="Enter doctor name"
+                  placeholder="Enter medical specialist name"
                 />
               </div>
             </div>
@@ -2636,7 +3032,7 @@ const CaseDetail: React.FC = () => {
                       <p className="text-sm text-foreground"><strong>Duration:</strong> {caseData.treatmentPlan.estimatedDuration}</p>
                       <p className="text-sm text-foreground"><strong>Estimated Cost:</strong> {caseData.treatmentPlan.currency === 'USD' ? '$' : caseData.treatmentPlan.currency === 'INR' ? '₹' : caseData.treatmentPlan.currency} {caseData.treatmentPlan.estimatedCost.toLocaleString()}</p>
                       {caseData.treatmentPlan.doctorName && (
-                        <p className="text-sm text-foreground"><strong>Doctor:</strong> {caseData.treatmentPlan.doctorName}</p>
+                        <p className="text-sm text-foreground"><strong>Medical Specialist:</strong> {caseData.treatmentPlan.doctorName}</p>
                       )}
                       {caseData.treatmentPlan.department && (
                         <p className="text-sm text-foreground"><strong>Department:</strong> {caseData.treatmentPlan.department}</p>
@@ -3105,80 +3501,7 @@ const CaseDetail: React.FC = () => {
 
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="space-y-4">
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle className="text-foreground">Status History</CardTitle>
-              <CardDescription>Complete timeline of case status changes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
-                <div className="space-y-6">
-                  {[...caseData.statusHistory].reverse().map((entry, index) => (
-                    <div key={index} className="relative pl-10">
-                      <div className={cn(
-                        'absolute left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center',
-                        index === 0 
-                          ? 'bg-primary border-primary' 
-                          : 'bg-card border-border'
-                      )}>
-                        {index === 0 ? (
-                          <Clock className="w-2.5 h-2.5 text-primary-foreground" />
-                        ) : (
-                          <CheckCircle2 className="w-2.5 h-2.5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="bg-muted/30 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <Badge variant="outline" className={getStatusBadgeClass(entry.status)}>
-                            {STATUS_LABELS[entry.status]}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(entry.timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          By: {entry.byName}
-                        </p>
-                        {entry.note && (
-                          <p className="text-sm text-foreground mt-1 italic">"{entry.note}"</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Activity Log */}
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle className="text-foreground">Activity Log</CardTitle>
-              <CardDescription>All actions taken on this case</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[...caseData.activityLog].reverse().map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 p-2 hover:bg-muted/30 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <Activity className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground">
-                        <span className="font-medium">{log.userName}</span>
-                        <span className="text-muted-foreground"> ({log.userRole})</span>
-                      </p>
-                      <p className="text-sm text-foreground">{log.action}: {log.details}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {new Date(log.timestamp).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <ActivityTimeline caseData={caseData} showStatusHistory={true} showActivityLog={true} compact={false} />
         </TabsContent>
 
         {/* Comments Tab - Chatbot Style */}
@@ -3351,9 +3674,9 @@ const CaseDetail: React.FC = () => {
                   >
                     <Send className="w-4 h-4" />
                   </Button>
-                )}
-              </div>
-            </div>
+              )}
+                      </div>
+                    </div>
           </Card>
         </TabsContent>
       </Tabs>

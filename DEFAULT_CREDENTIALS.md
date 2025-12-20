@@ -26,3 +26,4 @@ Client usernames are auto-generated in the format:
 - Password change is mandatory on first login
 - After password change, `passwordChanged` is set to `true`
 - The default password is temporary and should be changed immediately
+

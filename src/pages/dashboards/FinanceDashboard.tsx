@@ -14,9 +14,13 @@ import {
   TrendingUp,
   FileText,
   FolderKanban,
+  Activity,
+  ArrowRight,
 } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS, type Case, type PaymentRecord } from '@/types';
 import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ActivityTimeline from '@/components/cases/ActivityTimeline';
 
 interface PaymentWithCase extends PaymentRecord {
   caseId: string;
@@ -350,6 +354,100 @@ const FinanceDashboard: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Complete Case Information with Activity Timeline */}
+        {paymentCases.length > 0 && (
+          <Card className="card-elevated lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Case Details & Activity Timeline
+              </CardTitle>
+              <CardDescription>Complete information and activity tracking for payment-related cases</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue={paymentCases[0]?.id || 'none'} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 max-h-[200px] overflow-y-auto">
+                  {paymentCases.slice(0, 5).map((caseItem) => (
+                    <TabsTrigger key={caseItem.id} value={caseItem.id} className="text-xs">
+                      {caseItem.clientInfo.name.slice(0, 15)}...
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+                {paymentCases.slice(0, 5).map((caseItem) => (
+                  <TabsContent key={caseItem.id} value={caseItem.id} className="space-y-4 mt-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Case ID</p>
+                          <p className="text-sm font-medium text-foreground">{caseItem.id}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Patient Name</p>
+                          <p className="text-sm font-medium text-foreground">{caseItem.clientInfo.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Current Status</p>
+                          <Badge variant="outline" className={getStatusBadgeClass(caseItem.status)}>
+                            {STATUS_LABELS[caseItem.status]}
+                          </Badge>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Medical Condition</p>
+                          <p className="text-sm text-foreground">{caseItem.clientInfo.condition}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Total Payments</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {caseItem.payments.length} payment(s) • Total: {
+                              caseItem.payments
+                                .filter(p => p.status === 'completed')
+                                .reduce((sum, p) => sum + p.amount, 0)
+                                .toLocaleString()
+                            }
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Priority</p>
+                          <Badge variant="outline" className={
+                            caseItem.priority === 'urgent' ? 'bg-medical-urgent/10 text-medical-urgent border-medical-urgent/30' :
+                            caseItem.priority === 'high' ? 'bg-medical-warning/10 text-medical-warning border-medical-warning/30' :
+                            'bg-muted'
+                          }>
+                            {caseItem.priority}
+                          </Badge>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Documents</p>
+                          <p className="text-sm text-foreground">{caseItem.documents.length} document(s)</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Visa Status</p>
+                          <p className="text-sm text-foreground">
+                            {caseItem.visa?.status ? caseItem.visa.status.replace('_', ' ').toUpperCase() : 'Not Started'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Last Updated</p>
+                          <p className="text-sm text-foreground">{new Date(caseItem.updatedAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <ActivityTimeline caseData={caseItem} compact={true} />
+                    <Button asChild variant="outline" className="w-full">
+                      <Link to={`/cases/${caseItem.id}`}>
+                        View Full Case Details & Process Payments
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

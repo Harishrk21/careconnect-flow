@@ -1,0 +1,15 @@
+# Vercel ignore file
+node_modules
+.git
+.env.local
+.env.*.local
+dist
+*.log
+.DS_Store
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

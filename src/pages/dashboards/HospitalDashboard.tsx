@@ -73,6 +73,11 @@ const HospitalDashboard: React.FC = () => {
     return hospitals.filter(h => user.hospitalIds.includes(h.id));
   }, [user, hospitals]);
 
+  // Get current hospital (first one if multiple assigned)
+  const currentHospital = useMemo(() => {
+    return assignedHospitals.length > 0 ? assignedHospitals[0] : null;
+  }, [assignedHospitals]);
+
   // Filter cases
   const filteredCases = useMemo(() => {
     let filtered = assignedCases;

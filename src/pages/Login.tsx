@@ -289,21 +289,32 @@ const Login: React.FC = () => {
                 <p className="text-muted-foreground">admin / admin123</p>
               </div>
               <div className="p-2 bg-muted rounded-md">
-                <p className="font-medium text-foreground">Agent</p>
-                <p className="text-muted-foreground">agent.khan / agent123</p>
+                <p className="font-medium text-foreground">Hospital Agent</p>
+                <p className="text-muted-foreground">agent.hospital / agent123</p>
               </div>
               <div className="p-2 bg-muted rounded-md">
-                <p className="font-medium text-foreground">Hospital</p>
+                <p className="font-medium text-foreground">University Agent</p>
+                <p className="text-muted-foreground">agent.university / agent123</p>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <p className="font-medium text-foreground">Hospital User</p>
                 <p className="text-muted-foreground">hospital.apollo / hospital123</p>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <p className="font-medium text-foreground">University User</p>
+                <p className="text-muted-foreground">university.du / university123</p>
               </div>
               <div className="p-2 bg-muted rounded-md">
                 <p className="font-medium text-foreground">Finance</p>
                 <p className="text-muted-foreground">finance.omar / finance123</p>
               </div>
-              <div className="p-2 bg-muted rounded-md col-span-2">
-                <p className="font-medium text-foreground">Client (First-time Login)</p>
-                <p className="text-muted-foreground">client.aisha / client123</p>
-                <p className="text-xs text-muted-foreground mt-1">Will prompt for password change</p>
+              <div className="p-2 bg-muted rounded-md">
+                <p className="font-medium text-foreground">Hospital Client</p>
+                <p className="text-muted-foreground">client.mohammed / client123</p>
+              </div>
+              <div className="p-2 bg-muted rounded-md">
+                <p className="font-medium text-foreground">University Client</p>
+                <p className="text-muted-foreground">client.yasir / client123</p>
               </div>
             </div>
           </div>

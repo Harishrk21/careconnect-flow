@@ -40,6 +40,18 @@ const ClientDashboard: React.FC = () => {
     return colorClass;
   };
 
+  // Helper to get context-aware status labels
+  const getStatusLabel = (status: string, caseItem?: Case): string => {
+    const isUniCase = caseItem ? !!caseItem.assignedUniversity : false;
+    if (status === 'assigned_to_hospital') {
+      return isUniCase ? 'Assigned to University' : 'Assigned to Hospital';
+    }
+    if (status === 'hospital_review') {
+      return isUniCase ? 'University Review' : 'Hospital Review';
+    }
+    return STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status;
+  };
+
   const getProgressPercentage = (caseItem: Case): number => {
     const currentIndex = STATUS_FLOW.indexOf(caseItem.status);
     return ((currentIndex + 1) / STATUS_FLOW.length) * 100;
@@ -48,7 +60,7 @@ const ClientDashboard: React.FC = () => {
   const getNextMilestone = (caseItem: Case): string => {
     const currentIndex = STATUS_FLOW.indexOf(caseItem.status);
     if (currentIndex < STATUS_FLOW.length - 1) {
-      return STATUS_LABELS[STATUS_FLOW[currentIndex + 1]];
+      return getStatusLabel(STATUS_FLOW[currentIndex + 1], caseItem);
     }
     return 'Case Completed';
   };
@@ -108,11 +120,15 @@ const ClientDashboard: React.FC = () => {
     );
   }
 
+  const isUniversityCase = activeCase ? !!activeCase.assignedUniversity : false;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">My Medical Journey</h1>
+        <h1 className="text-3xl font-display font-bold text-foreground">
+          {isUniversityCase ? 'My Academic Journey' : 'My Medical Journey'}
+        </h1>
         <p className="text-muted-foreground mt-1">
           Track your case progress and stay updated
         </p>
@@ -127,7 +143,7 @@ const ClientDashboard: React.FC = () => {
               Case Progress
             </CardTitle>
             <CardDescription>
-              Current status: {STATUS_LABELS[activeCase.status]}
+              Current status: {getStatusLabel(activeCase.status, activeCase)}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -148,7 +164,7 @@ const ClientDashboard: React.FC = () => {
               <div className="p-3 bg-muted/30 rounded-lg">
                 <p className="text-xs text-muted-foreground mb-1">Current Stage</p>
                 <Badge variant="outline" className={getStatusBadgeClass(activeCase.status)}>
-                  {STATUS_LABELS[activeCase.status]}
+                  {getStatusLabel(activeCase.status, activeCase)}
                 </Badge>
               </div>
               <div className="p-3 bg-muted/30 rounded-lg">
@@ -402,7 +418,7 @@ const ClientDashboard: React.FC = () => {
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Current Status</p>
                       <Badge variant="outline" className={getStatusBadgeClass(activeCase.status)}>
-                        {STATUS_LABELS[activeCase.status]}
+                        {getStatusLabel(activeCase.status, activeCase)}
                       </Badge>
                     </div>
                     <div>

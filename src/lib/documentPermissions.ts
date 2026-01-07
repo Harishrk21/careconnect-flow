@@ -60,6 +60,17 @@ export const DOCUMENT_CATEGORIES = {
     'medical_reports',
     'medical_prescription',
   ] as DocumentType[],
+  ACADEMIC: [
+    'academic_certificates',
+    'transcripts',
+    'degree_certificate',
+    'mark_sheets',
+    'english_proficiency',
+    'statement_of_purpose',
+    'recommendation_letters',
+    'financial_documents',
+    'admission_letter',
+  ] as DocumentType[],
 };
 
 /**
@@ -68,7 +79,8 @@ export const DOCUMENT_CATEGORIES = {
 export const getAvailableDocumentTypes = (
   role: UserRole,
   caseStatus: CaseStatus,
-  alreadyUploaded: DocumentType[]
+  alreadyUploaded: DocumentType[],
+  isUniversityCase?: boolean
 ): DocumentType[] => {
   const allTypes: DocumentType[] = Object.keys(DOCUMENT_CATEGORIES).flatMap(
     cat => DOCUMENT_CATEGORIES[cat as keyof typeof DOCUMENT_CATEGORIES]
@@ -82,6 +94,17 @@ export const getAvailableDocumentTypes = (
     case 'agent':
       // Agents can upload initial documents in early stages
       if (caseStatus === 'new' || caseStatus === 'case_agent_review') {
+        if (isUniversityCase) {
+          // For university cases, show academic documents + basic travel docs
+          return available.filter(type => 
+            DOCUMENT_CATEGORIES.ACADEMIC.includes(type) ||
+            type === 'passport_front' ||
+            type === 'passport_back' ||
+            type === 'patient_photo' ||
+            type === 'attender_passport' ||
+            type === 'attender_id'
+          );
+        }
         return available.filter(type => DOCUMENT_CATEGORIES.INITIAL.includes(type));
       }
       // Agents can upload visa copy after visa approval
@@ -99,7 +122,11 @@ export const getAvailableDocumentTypes = (
       return [];
 
     case 'hospital':
-      // Hospital agents can upload treatment-related documents
+      // Hospital users can upload treatment-related documents
+      // Only allow if it's NOT a university case
+      if (isUniversityCase) {
+        return []; // Hospital users should only work on hospital cases
+      }
       if (
         caseStatus === 'case_accepted' ||
         caseStatus === 'treatment_plan_uploaded' ||
@@ -113,6 +140,31 @@ export const getAvailableDocumentTypes = (
         caseStatus === 'discharge_process'
       ) {
         return available.filter(type => DOCUMENT_CATEGORIES.DISCHARGE.includes(type));
+      }
+      return [];
+
+    case 'university':
+      // University users can upload academic-related documents for university cases
+      // Only allow if it's a university case
+      if (!isUniversityCase) {
+        return []; // University users should only work on university cases
+      }
+      // University users can upload academic documents during review stages
+      if (
+        caseStatus === 'case_accepted' ||
+        caseStatus === 'hospital_review' ||
+        caseStatus === 'assigned_to_hospital' ||
+        caseStatus === 'admin_review' ||
+        caseStatus === 'case_agent_review'
+      ) {
+        return available.filter(type => DOCUMENT_CATEGORIES.ACADEMIC.includes(type));
+      }
+      // University users can also upload admission letter after acceptance
+      if (caseStatus === 'visa_processing_documents' || caseStatus === 'visa_approved') {
+        return available.filter(type => 
+          DOCUMENT_CATEGORIES.ACADEMIC.includes(type) || 
+          type === 'admission_letter'
+        );
       }
       return [];
 
@@ -145,12 +197,22 @@ export const getAvailableDocumentTypes = (
  */
 export const getRequiredDocuments = (
   role: UserRole,
-  caseStatus: CaseStatus
+  caseStatus: CaseStatus,
+  isUniversityCase?: boolean
 ): DocumentType[] => {
   switch (role) {
     case 'agent':
       // Initial required documents for agents
       if (caseStatus === 'new' || caseStatus === 'case_agent_review') {
+        if (isUniversityCase) {
+          // For university cases, require academic documents
+          return [
+            'passport_front',
+            'academic_certificates',
+            'transcripts',
+            'english_proficiency',
+          ];
+        }
         return [
           'passport_front',
           'passport_back',
@@ -190,9 +252,10 @@ export const getRequiredDocuments = (
 export const isDocumentTypeAllowed = (
   documentType: DocumentType,
   role: UserRole,
-  caseStatus: CaseStatus
+  caseStatus: CaseStatus,
+  isUniversityCase?: boolean
 ): boolean => {
-  const available = getAvailableDocumentTypes(role, caseStatus, []);
+  const available = getAvailableDocumentTypes(role, caseStatus, [], isUniversityCase);
   return available.includes(documentType);
 };
 

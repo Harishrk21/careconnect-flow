@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import type { Case, Hospital, User, Notification, CaseStatus, Document as CaseDocument, ActivityLog, Comment, PaymentRecord } from '@/types';
+import type { Case, Hospital, University, User, Notification, CaseStatus, Document as CaseDocument, ActivityLog, Comment, PaymentRecord } from '@/types';
 import {
   getAllCases,
   getCaseById,
@@ -10,6 +10,11 @@ import {
   addHospital,
   updateHospital as updateHospitalStorage,
   deleteHospital as deleteHospitalStorage,
+  getAllUniversities,
+  getUniversityById,
+  addUniversity,
+  updateUniversity as updateUniversityStorage,
+  deleteUniversity as deleteUniversityStorage,
   getAllUsers,
   getUserById,
   addUser,
@@ -27,6 +32,7 @@ import { useAuth } from './AuthContext';
 interface DataContextType {
   cases: Case[];
   hospitals: Hospital[];
+  universities: University[];
   users: User[];
   notifications: Notification[];
   isLoading: boolean;
@@ -38,8 +44,10 @@ interface DataContextType {
   updateCaseData: (caseId: string, updates: Partial<Case>) => Promise<void>;
   addDocument: (caseId: string, document: Omit<CaseDocument, 'id'>) => Promise<void>;
   removeDocument: (caseId: string, documentId: string) => Promise<void>;
+  verifyDocument: (caseId: string, documentId: string, status: 'verified' | 'rejected', notes?: string) => Promise<void>;
   addComment: (caseId: string, message: string, isPreset?: boolean) => Promise<void>;
   assignHospital: (caseId: string, hospitalId: string) => Promise<void>;
+  assignUniversity: (caseId: string, universityId: string) => Promise<void>;
   // User operations
   createUser: (userData: Omit<User, 'id'>) => Promise<User>;
   updateUser: (userId: string, userData: Partial<User>) => Promise<void>;
@@ -50,6 +58,11 @@ interface DataContextType {
   updateHospital: (hospitalId: string, hospitalData: Partial<Hospital>) => Promise<void>;
   deleteHospital: (hospitalId: string) => Promise<void>;
   refreshHospitals: () => Promise<void>;
+  // University operations
+  createUniversity: (universityData: Omit<University, 'id'>) => Promise<University>;
+  updateUniversity: (universityId: string, universityData: Partial<University>) => Promise<void>;
+  deleteUniversity: (universityId: string) => Promise<void>;
+  refreshUniversities: () => Promise<void>;
   // Payment operations
   addPayment: (caseId: string, payment: Omit<PaymentRecord, 'id'>) => Promise<void>;
   updatePayment: (caseId: string, paymentId: string, payment: Partial<PaymentRecord>) => Promise<void>;
@@ -68,6 +81,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { user } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [universities, setUniversities] = useState<University[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,32 +89,54 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [casesData, hospitalsData, usersData] = await Promise.all([
-        getAllCases(),
-        getAllHospitals(),
-        getAllUsers(),
+      const [casesData, hospitalsData, universitiesData, usersData] = await Promise.all([
+        getAllCases().catch(err => { console.error('Error loading cases:', err); return []; }),
+        getAllHospitals().catch(err => { console.error('Error loading hospitals:', err); return []; }),
+        getAllUniversities().catch(err => { console.error('Error loading universities:', err); return []; }),
+        getAllUsers().catch(err => { console.error('Error loading users:', err); return []; }),
       ]);
       
       setCases(casesData);
       setHospitals(hospitalsData);
+      setUniversities(universitiesData);
       setUsers(usersData);
       
       if (user) {
-        const notifs = await getNotificationsByUser(user.id);
-        setNotifications(notifs.sort((a, b) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        ));
+        try {
+          const notifs = await getNotificationsByUser(user.id);
+          setNotifications(notifs.sort((a, b) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          ));
+        } catch (error) {
+          console.error('Error loading notifications:', error);
+          setNotifications([]);
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
+      // Set empty arrays to prevent infinite loading
+      setCases([]);
+      setHospitals([]);
+      setUniversities([]);
+      setUsers([]);
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
+    // Always try to load data, even if user is null (for initial setup)
+    // But set loading to false if no user after a short delay
     if (user) {
       loadData();
+    } else {
+      // If no user, still try to load basic data but don't wait forever
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false);
+      }, 2000);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [user, loadData]);
 
@@ -224,6 +260,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const newDoc: CaseDocument = {
       ...document,
       id: generateId('doc'),
+      verificationStatus: 'pending', // New documents require verification
     };
 
     const activityEntry: ActivityLog = {
@@ -277,50 +314,111 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await refreshCases();
   };
 
+  const verifyDocument = async (caseId: string, documentId: string, status: 'verified' | 'rejected', notes?: string) => {
+    await simulateDelay(300);
+    const existingCase = await getCaseById(caseId);
+    if (!existingCase) return;
+
+    const updatedDocuments = existingCase.documents.map(doc => 
+      doc.id === documentId 
+        ? { 
+            ...doc, 
+            verificationStatus: status,
+            verifiedBy: user?.id,
+            verifiedAt: new Date().toISOString(),
+            verificationNotes: notes
+          }
+        : doc
+    );
+
+    const doc = existingCase.documents.find(d => d.id === documentId);
+    const activityEntry: ActivityLog = {
+      id: generateId('log'),
+      caseId,
+      userId: user?.id || '',
+      userName: user?.name || '',
+      userRole: user?.role || 'admin',
+      action: `Document ${status === 'verified' ? 'Verified' : 'Rejected'}`,
+      details: `${status === 'verified' ? 'Verified' : 'Rejected'} ${doc?.name || 'document'}${notes ? `: ${notes}` : ''}`,
+      timestamp: new Date().toISOString(),
+    };
+
+    const updatedCase = {
+      ...existingCase,
+      documents: updatedDocuments,
+      activityLog: [...existingCase.activityLog, activityEntry],
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateCase(updatedCase);
+    await refreshCases();
+  };
+
   // Generate chatbot auto-response based on case status and message
-  const generateChatbotResponse = (caseStatus: CaseStatus, message: string): string => {
+  const generateChatbotResponse = (caseStatus: CaseStatus, message: string, isUniversityCase: boolean = false): string => {
     const statusLower = caseStatus.toLowerCase();
     const messageLower = message.toLowerCase();
+    const entityType = isUniversityCase ? 'university' : 'hospital';
+    const programType = isUniversityCase ? 'program' : 'treatment';
+    const admissionType = isUniversityCase ? 'admission date' : 'appointment';
 
     // Status-based responses
     if (statusLower.includes('new') || statusLower.includes('agent_review')) {
       if (messageLower.includes('update') || messageLower.includes('status')) {
         return "Your case is currently under review by our SudInd coordination team. We're processing your documents and will update you soon.";
       }
-      if (messageLower.includes('appointment') || messageLower.includes('when')) {
-        return "Your appointment schedule will be confirmed once your case is reviewed and a hospital is assigned. We'll notify you as soon as this is arranged.";
+      if (messageLower.includes('appointment') || messageLower.includes('when') || messageLower.includes('admission')) {
+        return isUniversityCase
+          ? "Your admission schedule will be confirmed once your case is reviewed and a university is assigned. We'll notify you as soon as this is arranged."
+          : "Your appointment schedule will be confirmed once your case is reviewed and a hospital is assigned. We'll notify you as soon as this is arranged.";
       }
       return "Thank you for your message. Your case is in the initial review stage. Our team is working on processing your documents.";
     }
 
     if (statusLower.includes('admin_review') || statusLower.includes('assigned')) {
       if (messageLower.includes('update') || messageLower.includes('status')) {
-        return "Your case is being reviewed by our admin team. Once approved, it will be forwarded to a hospital for evaluation.";
+        return isUniversityCase
+          ? "Your case is being reviewed by our admin team. Once approved, it will be forwarded to a university for evaluation."
+          : "Your case is being reviewed by our admin team. Once approved, it will be forwarded to a hospital for evaluation.";
       }
-      if (messageLower.includes('hospital')) {
-        return "We're in the process of assigning your case to an appropriate hospital. You'll be notified once a hospital is assigned.";
+      if (messageLower.includes('hospital') || messageLower.includes('university')) {
+        return isUniversityCase
+          ? "We're in the process of assigning your case to an appropriate university. You'll be notified once a university is assigned."
+          : "We're in the process of assigning your case to an appropriate hospital. You'll be notified once a hospital is assigned.";
       }
       return "Your case is currently under administrative review. We'll keep you updated on the progress.";
     }
 
     if (statusLower.includes('hospital_review') || statusLower.includes('case_accepted')) {
-      if (messageLower.includes('appointment') || messageLower.includes('when')) {
-        return "Your case has been assigned to a hospital and is under review. The hospital will provide treatment details and appointment schedule once they accept your case.";
+      if (messageLower.includes('appointment') || messageLower.includes('when') || messageLower.includes('admission')) {
+        return isUniversityCase
+          ? "Your case has been assigned to a university and is under review. The university will provide program details and admission schedule once they accept your case."
+          : "Your case has been assigned to a hospital and is under review. The hospital will provide treatment details and appointment schedule once they accept your case.";
       }
-      if (messageLower.includes('treatment')) {
-        return "The assigned hospital is reviewing your medical case. They will provide a treatment plan and schedule once the review is complete.";
+      if (messageLower.includes('treatment') || messageLower.includes('program')) {
+        return isUniversityCase
+          ? "The assigned university is reviewing your academic case. They will provide a program plan and schedule once the review is complete."
+          : "The assigned hospital is reviewing your medical case. They will provide a treatment plan and schedule once the review is complete.";
       }
-      return "Your case is being reviewed by the assigned hospital. They will provide treatment details and next steps shortly.";
+      return isUniversityCase
+        ? "Your case is being reviewed by the assigned university. They will provide program details and next steps shortly."
+        : "Your case is being reviewed by the assigned hospital. They will provide treatment details and next steps shortly.";
     }
 
     if (statusLower.includes('treatment_plan')) {
-      if (messageLower.includes('appointment') || messageLower.includes('when')) {
-        return "A treatment plan has been uploaded for your case. The hospital will coordinate with you regarding appointment dates and travel arrangements.";
+      if (messageLower.includes('appointment') || messageLower.includes('when') || messageLower.includes('admission')) {
+        return isUniversityCase
+          ? "A program plan has been uploaded for your case. The university will coordinate with you regarding admission dates and travel arrangements."
+          : "A treatment plan has been uploaded for your case. The hospital will coordinate with you regarding appointment dates and travel arrangements.";
       }
       if (messageLower.includes('travel') || messageLower.includes('visa')) {
-        return "Your treatment plan is ready. The next step is visa processing. Our team will guide you through the visa application process.";
+        return isUniversityCase
+          ? "Your program plan is ready. The next step is visa processing. Our team will guide you through the visa application process."
+          : "Your treatment plan is ready. The next step is visa processing. Our team will guide you through the visa application process.";
       }
-      return "Great news! A treatment plan has been prepared for your case. Our team will coordinate the next steps including visa processing and travel arrangements.";
+      return isUniversityCase
+        ? "Great news! A program plan has been prepared for your case. Our team will coordinate the next steps including visa processing and travel arrangements."
+        : "Great news! A treatment plan has been prepared for your case. Our team will coordinate the next steps including visa processing and travel arrangements.";
     }
 
     if (statusLower.includes('visa')) {
@@ -347,17 +445,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     if (statusLower.includes('treatment_in_progress') || statusLower.includes('frro')) {
-      if (messageLower.includes('appointment') || messageLower.includes('treatment')) {
-        return "Your treatment is currently in progress at the hospital. The medical team is providing the best care. We'll keep you updated on your progress.";
+      if (messageLower.includes('appointment') || messageLower.includes('treatment') || messageLower.includes('program')) {
+        return isUniversityCase
+          ? "Your program is currently in progress at the university. The academic team is providing the best support. We'll keep you updated on your progress."
+          : "Your treatment is currently in progress at the hospital. The medical team is providing the best care. We'll keep you updated on your progress.";
       }
-      return "Your treatment is ongoing. The hospital medical team is taking excellent care of you. If you have any concerns, please let us know.";
+      return isUniversityCase
+        ? "Your program is ongoing. The university academic team is providing excellent support. If you have any concerns, please let us know."
+        : "Your treatment is ongoing. The hospital medical team is taking excellent care of you. If you have any concerns, please let us know.";
     }
 
     if (statusLower.includes('discharge') || statusLower.includes('final_report')) {
       if (messageLower.includes('next') || messageLower.includes('steps')) {
-        return "Your treatment is nearing completion. The hospital is preparing your discharge summary and final reports. We'll share these with you soon.";
+        return isUniversityCase
+          ? "Your program is nearing completion. The university is preparing your completion summary and final reports. We'll share these with you soon."
+          : "Your treatment is nearing completion. The hospital is preparing your discharge summary and final reports. We'll share these with you soon.";
       }
-      return "Your treatment is complete. The hospital is finalizing your discharge documents and medical reports. We'll share these with you shortly.";
+      return isUniversityCase
+        ? "Your program is complete. The university is finalizing your completion documents and academic reports. We'll share these with you shortly."
+        : "Your treatment is complete. The hospital is finalizing your discharge documents and medical reports. We'll share these with you shortly.";
     }
 
     if (statusLower.includes('case_closed')) {
@@ -402,7 +508,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // If client sent a message, add auto-response
     if (user?.role === 'client' && isPreset) {
       await simulateDelay(1000); // Simulate AI processing time
-      const autoResponse = generateChatbotResponse(existingCase.status, message);
+      const isUniversityCase = !!existingCase.assignedUniversity;
+      const autoResponse = generateChatbotResponse(existingCase.status, message, isUniversityCase);
       const botComment: Comment = {
         id: generateId('comment'),
         caseId,
@@ -455,6 +562,45 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const updatedCase = {
       ...existingCase,
       assignedHospital: hospitalId,
+      status: 'assigned_to_hospital' as CaseStatus,
+      statusHistory: [...existingCase.statusHistory, statusEntry],
+      activityLog: [...existingCase.activityLog, activityEntry],
+      updatedAt: new Date().toISOString(),
+    };
+
+    await updateCase(updatedCase);
+    await refreshCases();
+  };
+
+  const assignUniversity = async (caseId: string, universityId: string) => {
+    await simulateDelay(400);
+    const existingCase = await getCaseById(caseId);
+    if (!existingCase) return;
+
+    const university = universities.find(u => u.id === universityId);
+
+    const activityEntry: ActivityLog = {
+      id: generateId('log'),
+      caseId,
+      userId: user?.id || '',
+      userName: user?.name || '',
+      userRole: user?.role || 'admin',
+      action: 'University Assigned',
+      details: `Case assigned to ${university?.name || 'university'}`,
+      timestamp: new Date().toISOString(),
+    };
+
+    const statusEntry = {
+      status: 'assigned_to_hospital' as CaseStatus, // Using same status for now
+      timestamp: new Date().toISOString(),
+      by: user?.id || '',
+      byName: user?.name || '',
+      note: `Assigned to ${university?.name}`,
+    };
+
+    const updatedCase = {
+      ...existingCase,
+      assignedUniversity: universityId,
       status: 'assigned_to_hospital' as CaseStatus,
       statusHistory: [...existingCase.statusHistory, statusEntry],
       activityLog: [...existingCase.activityLog, activityEntry],
@@ -587,6 +733,58 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setHospitals(hospitalsData);
   };
 
+  const createUniversity = async (universityData: Omit<University, 'id'>): Promise<University> => {
+    await simulateDelay(500);
+    const newUniversity: University = {
+      ...universityData,
+      id: generateId('university'),
+    };
+    await addUniversity(newUniversity);
+    const universitiesData = await getAllUniversities();
+    setUniversities(universitiesData);
+    return newUniversity;
+  };
+
+  const updateUniversity = async (universityId: string, universityData: Partial<University>): Promise<void> => {
+    await simulateDelay(400);
+    const existingUniversity = await getUniversityById(universityId);
+    if (!existingUniversity) throw new Error('University not found');
+    
+    const updatedUniversity: University = {
+      ...existingUniversity,
+      ...universityData,
+      id: universityId, // Ensure ID doesn't change
+    };
+    
+    await updateUniversityStorage(updatedUniversity);
+    const universitiesData = await getAllUniversities();
+    setUniversities(universitiesData);
+  };
+
+  const deleteUniversity = async (universityId: string): Promise<void> => {
+    await simulateDelay(400);
+    // Check if university has assigned cases
+    const universityCases = cases.filter(c => c.assignedUniversity === universityId);
+    if (universityCases.length > 0) {
+      throw new Error(`Cannot delete university with ${universityCases.length} assigned case(s)`);
+    }
+    
+    // Check if university has users
+    const universityUsers = users.filter(u => u.universityIds && u.universityIds.includes(universityId));
+    if (universityUsers.length > 0) {
+      throw new Error(`Cannot delete university with ${universityUsers.length} associated user(s)`);
+    }
+    
+    await deleteUniversityStorage(universityId);
+    const universitiesData = await getAllUniversities();
+    setUniversities(universitiesData);
+  };
+
+  const refreshUniversities = async () => {
+    const universitiesData = await getAllUniversities();
+    setUniversities(universitiesData);
+  };
+
   const addPayment = async (caseId: string, payment: Omit<PaymentRecord, 'id'>): Promise<void> => {
     await simulateDelay(400);
     const existingCase = await getCaseById(caseId);
@@ -708,6 +906,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           c.assignedHospital && 
           (user.hospitalIds || []).includes(c.assignedHospital)
         )
+      : user?.role === 'university'
+      ? cases.filter(c => 
+          c.assignedUniversity && 
+          (user.universityIds || []).includes(c.assignedUniversity)
+        )
       : cases;
 
     return {
@@ -728,6 +931,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       value={{
         cases,
         hospitals,
+        universities,
         users,
         notifications,
         isLoading,
@@ -738,8 +942,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateCaseData,
         addDocument,
         removeDocument,
+        verifyDocument,
         addComment,
         assignHospital,
+        assignUniversity,
         createUser,
         updateUser,
         deleteUser,
@@ -748,6 +954,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updateHospital,
         deleteHospital,
         refreshHospitals,
+        createUniversity,
+        updateUniversity,
+        deleteUniversity,
+        refreshUniversities,
         addPayment,
         updatePayment,
         deletePayment,

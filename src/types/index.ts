@@ -1,5 +1,8 @@
 // User Roles
-export type UserRole = 'admin' | 'agent' | 'client' | 'hospital' | 'finance';
+export type UserRole = 'admin' | 'agent' | 'client' | 'hospital' | 'university' | 'finance';
+
+// Agent Type - for agents in Sudan
+export type AgentType = 'hospital' | 'university';
 
 // User Interface
 export interface User {
@@ -16,6 +19,8 @@ export interface User {
   lastLogin: string;
   avatar?: string;
   hospitalIds?: string[]; // For hospital users - can handle multiple hospitals
+  universityIds?: string[]; // For university users - can handle multiple universities
+  agentType?: AgentType; // For agents - specifies if agent handles hospital or university cases
 }
 
 // Case Status Types
@@ -161,7 +166,16 @@ export type DocumentType =
   | 'payment_receipt'
   | 'hospital_invoice'
   | 'credit_payment_proof'
-  | 'bank_transfer';
+  | 'bank_transfer'
+  | 'academic_certificates'
+  | 'transcripts'
+  | 'degree_certificate'
+  | 'mark_sheets'
+  | 'english_proficiency'
+  | 'statement_of_purpose'
+  | 'recommendation_letters'
+  | 'financial_documents'
+  | 'admission_letter';
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   passport_front: 'Passport Copy (Front)',
@@ -194,6 +208,15 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   hospital_invoice: 'Invoice from Hospital',
   credit_payment_proof: 'Credit Payment Proof',
   bank_transfer: 'Bank Transfer Documents',
+  academic_certificates: 'Academic Certificates',
+  transcripts: 'Academic Transcripts',
+  degree_certificate: 'Degree Certificate',
+  mark_sheets: 'Mark Sheets/Grade Reports',
+  english_proficiency: 'English Proficiency Test (IELTS/TOEFL)',
+  statement_of_purpose: 'Statement of Purpose (SOP)',
+  recommendation_letters: 'Recommendation Letters',
+  financial_documents: 'Financial Documents (Bank Statements)',
+  admission_letter: 'Admission Letter',
 };
 
 export const REQUIRED_DOCUMENTS: DocumentType[] = [
@@ -217,6 +240,10 @@ export interface Document {
   mimeType: string;
   fileData?: string; // Base64 encoded file data for storage
   textFileId?: string; // Reference to companion text file
+  verificationStatus?: 'pending' | 'verified' | 'rejected'; // Document verification status
+  verifiedBy?: string; // User ID who verified/rejected
+  verifiedAt?: string; // Timestamp of verification
+  verificationNotes?: string; // Notes from reviewer
 }
 
 // Status History Entry
@@ -325,6 +352,7 @@ export interface Case {
   clientInfo: ClientInfo;
   attenderInfo?: AttenderInfo;
   assignedHospital?: string;
+  assignedUniversity?: string;
   treatmentPlan?: TreatmentPlan;
   payments: PaymentRecord[];
   visa: VisaInfo;
@@ -348,6 +376,20 @@ export interface Hospital {
   bedCapacity: number;
   availableBeds: number;
   accreditation: string[];
+  contactPerson: string;
+}
+
+// University Interface
+export interface University {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  address: string;
+  phone: string;
+  email: string;
+  courses: string[]; // Available courses/programs
+  accreditation: string[]; // UGC, AICTE, etc.
   contactPerson: string;
 }
 

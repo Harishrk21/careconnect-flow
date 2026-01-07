@@ -27,22 +27,36 @@ import {
   Filter,
   Eye,
   Building2,
+  GraduationCap,
   Calendar,
   User,
   AlertTriangle,
   ChevronRight,
 } from 'lucide-react';
-import { STATUS_LABELS, STATUS_COLORS, type CaseStatus } from '@/types';
+import { STATUS_LABELS, STATUS_COLORS, type CaseStatus, type Case } from '@/types';
 import { cn } from '@/lib/utils';
 
 const CasesList: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { cases, hospitals, isLoading } = useData();
+  const { cases, hospitals, universities, isLoading } = useData();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [hospitalFilter, setHospitalFilter] = useState<string>('all');
+  const [universityFilter, setUniversityFilter] = useState<string>('all');
+
+  // Helper to get context-aware status labels
+  const getStatusLabel = (status: string, caseItem?: Case): string => {
+    const isUniCase = caseItem ? !!caseItem.assignedUniversity : false;
+    if (status === 'assigned_to_hospital') {
+      return isUniCase ? 'Assigned to University' : 'Assigned to Hospital';
+    }
+    if (status === 'hospital_review') {
+      return isUniCase ? 'University Review' : 'Hospital Review';
+    }
+    return STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status;
+  };
 
   // Filter cases based on user role
   const userCases = useMemo(() => {
@@ -51,11 +65,31 @@ const CasesList: React.FC = () => {
       case 'admin':
         return cases;
       case 'agent':
-        return cases.filter(c => c.agentId === user.id);
+        // Filter by agent ID and agent type (hospital or university)
+        return cases.filter(c => {
+          if (c.agentId !== user.id) return false;
+          // If agent has agentType, filter cases by type
+          if (user.agentType === 'hospital') {
+            return !c.assignedUniversity; // Hospital agents only see hospital cases
+          } else if (user.agentType === 'university') {
+            return !!c.assignedUniversity; // University agents only see university cases
+          }
+          // If no agentType set (legacy), show all cases
+          return true;
+        });
       case 'hospital':
+        // Hospital users should only see hospital cases (not university cases)
         return cases.filter(c => 
           c.assignedHospital && 
+          !c.assignedUniversity && // Exclude university cases
           (user.hospitalIds || []).includes(c.assignedHospital)
+        );
+      case 'university':
+        // University users should only see university cases (not hospital cases)
+        return cases.filter(c => 
+          c.assignedUniversity && 
+          !c.assignedHospital && // Exclude hospital cases
+          (user.universityIds || []).includes(c.assignedUniversity)
         );
       case 'finance':
         return cases.filter(c => 
@@ -88,8 +122,10 @@ const CasesList: React.FC = () => {
 
       // Hospital filter
       const matchesHospital = hospitalFilter === 'all' || caseItem.assignedHospital === hospitalFilter;
+      // University filter
+      const matchesUniversity = universityFilter === 'all' || caseItem.assignedUniversity === universityFilter;
 
-      return matchesSearch && matchesStatus && matchesPriority && matchesHospital;
+      return matchesSearch && matchesStatus && matchesPriority && matchesHospital && matchesUniversity;
     });
   }, [userCases, searchQuery, statusFilter, priorityFilter, hospitalFilter]);
 
@@ -190,20 +226,36 @@ const CasesList: React.FC = () => {
               </Select>
 
               {user?.role === 'admin' && (
-                <Select value={hospitalFilter} onValueChange={setHospitalFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <Building2 className="w-4 h-4 mr-2" />
-                    <SelectValue placeholder="Hospital" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    <SelectItem value="all">All Hospitals</SelectItem>
-                    {hospitals.map((hospital) => (
-                      <SelectItem key={hospital.id} value={hospital.id}>
-                        {hospital.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <>
+                  <Select value={hospitalFilter} onValueChange={setHospitalFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <Building2 className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="Hospital" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="all">All Hospitals</SelectItem>
+                      {hospitals.map((hospital) => (
+                        <SelectItem key={hospital.id} value={hospital.id}>
+                          {hospital.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={universityFilter} onValueChange={setUniversityFilter}>
+                    <SelectTrigger className="w-[180px]">
+                      <GraduationCap className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="University" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="all">All Universities</SelectItem>
+                      {universities.map((university) => (
+                        <SelectItem key={university.id} value={university.id}>
+                          {university.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
               )}
             </div>
           </div>
@@ -229,9 +281,9 @@ const CasesList: React.FC = () => {
                 <TableHeader>
                   <TableRow className="border-border">
                     <TableHead className="text-muted-foreground">Case ID</TableHead>
-                    <TableHead className="text-muted-foreground">Patient</TableHead>
-                    <TableHead className="text-muted-foreground">Condition</TableHead>
-                    <TableHead className="text-muted-foreground">Hospital</TableHead>
+                    <TableHead className="text-muted-foreground">Patient/Student</TableHead>
+                    <TableHead className="text-muted-foreground">Condition/Course</TableHead>
+                    <TableHead className="text-muted-foreground">Hospital/University</TableHead>
                     <TableHead className="text-muted-foreground">Status</TableHead>
                     <TableHead className="text-muted-foreground">Priority</TableHead>
                     <TableHead className="text-muted-foreground">Updated</TableHead>
@@ -241,6 +293,8 @@ const CasesList: React.FC = () => {
                 <TableBody>
                   {sortedCases.map((caseItem) => {
                     const hospital = hospitals.find(h => h.id === caseItem.assignedHospital);
+                    const university = universities.find(u => u.id === caseItem.assignedUniversity);
+                    const isUniversityCase = !!caseItem.assignedUniversity;
                     return (
                       <TableRow 
                         key={caseItem.id} 
@@ -269,7 +323,12 @@ const CasesList: React.FC = () => {
                           {caseItem.clientInfo.condition}
                         </TableCell>
                         <TableCell>
-                          {hospital ? (
+                          {isUniversityCase && university ? (
+                            <div className="flex items-center gap-1.5">
+                              <GraduationCap className="w-3.5 h-3.5 text-medical-info" />
+                              <span className="text-sm text-foreground">{university.name}</span>
+                            </div>
+                          ) : hospital ? (
                             <div className="flex items-center gap-1.5">
                               <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                               <span className="text-sm text-foreground">{hospital.name}</span>
@@ -283,7 +342,7 @@ const CasesList: React.FC = () => {
                             variant="outline" 
                             className={cn('text-xs', getStatusBadgeClass(caseItem.status))}
                           >
-                            {STATUS_LABELS[caseItem.status]}
+                            {getStatusLabel(caseItem.status, caseItem)}
                           </Badge>
                         </TableCell>
                         <TableCell>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import type { User } from '@/types';
 import { getUserByUsername, updateUser, simulateDelay } from '@/lib/storage';
 import { initializeSeedData } from '@/lib/seedData';
@@ -25,22 +25,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const initAuth = async () => {
+      // Set a timeout to ensure loading state is always resolved
+      const timeoutId = setTimeout(() => {
+        console.warn('Auth initialization timeout - forcing loading to complete');
+        setIsLoading(false);
+      }, 35000); // 35 second timeout (longer to allow seed data)
+
       try {
-        // Initialize seed data if needed
-        await initializeSeedData();
+        // Initialize seed data if needed (with error handling and longer timeout)
+        try {
+          const seedPromise = initializeSeedData();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Seed data initialization timeout')), 30000) // 30 seconds
+          );
+          await Promise.race([seedPromise, timeoutPromise]);
+        } catch (seedError) {
+          console.error('Seed data initialization error:', seedError);
+          // Continue even if seed data fails - don't block app startup
+        }
         
         // Check for existing session
-        const sessionData = sessionStorage.getItem('sudind_session');
-        if (sessionData) {
-          const session = JSON.parse(sessionData);
-          const userData = await getUserByUsername(session.username);
-          if (userData) {
-            setUser(userData);
+        try {
+          const sessionData = sessionStorage.getItem('sudind_session');
+          if (sessionData) {
+            const session = JSON.parse(sessionData);
+            const userData = await getUserByUsername(session.username);
+            if (userData) {
+              setUser(userData);
+            }
           }
+        } catch (sessionError) {
+          console.error('Session restoration error:', sessionError);
+          // Clear invalid session
+          sessionStorage.removeItem('sudind_session');
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     };
@@ -48,7 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     setIsLoading(true);
     await simulateDelay(800);
 
@@ -126,14 +148,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(false);
       return { success: false, error: 'An error occurred during login' };
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     sessionStorage.removeItem('sudind_session');
-  };
+  }, []);
 
-  const updatePassword = async (newPassword: string): Promise<boolean> => {
+  const updatePassword = useCallback(async (newPassword: string): Promise<boolean> => {
     if (!user) return false;
 
     try {
@@ -161,9 +183,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Password update error:', error);
       return false;
     }
-  };
+  }, [user]);
 
-  const refreshUser = async (): Promise<void> => {
+  const refreshUser = useCallback(async (): Promise<void> => {
     try {
       const sessionData = sessionStorage.getItem('medcoord_session');
       if (sessionData) {
@@ -176,20 +198,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (error) {
       console.error('Error refreshing user:', error);
     }
-  };
+  }, []);
+
+  const contextValue = useMemo(() => {
+    // Ensure all required functions are available
+    const safeLogin = login || (async () => ({ success: false, error: 'Not initialized' }));
+    const safeLogout = logout || (() => {});
+    const safeUpdatePassword = updatePassword || (async () => false);
+    const safeRefreshUser = refreshUser || (async () => {});
+    
+    return {
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login: safeLogin,
+      logout: safeLogout,
+      updatePassword: safeUpdatePassword,
+      refreshUser: safeRefreshUser,
+    };
+  }, [user, isLoading, login, logout, updatePassword, refreshUser]);
+
+  // Double-check context value is defined
+  if (!contextValue) {
+    console.error('AuthContext value is undefined - this should not happen');
+  }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout,
-        updatePassword,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

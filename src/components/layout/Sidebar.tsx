@@ -7,6 +7,7 @@ import {
   FolderKanban,
   Users,
   Building2,
+  GraduationCap,
   FileText,
   CreditCard,
   Settings,
@@ -54,13 +55,13 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       icon: LayoutDashboard,
       label: 'Dashboard',
       href: '/dashboard',
-      roles: ['admin', 'agent', 'client', 'hospital', 'finance'],
+      roles: ['admin', 'agent', 'client', 'hospital', 'university', 'finance'],
     },
     {
       icon: FolderKanban,
       label: 'Cases',
       href: '/cases',
-      roles: ['admin', 'agent', 'hospital', 'finance'],
+      roles: ['admin', 'agent', 'hospital', 'university', 'finance'],
     },
     {
       icon: Users,
@@ -81,16 +82,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       roles: ['admin'],
     },
     {
-      icon: FileText,
-      label: 'Documents',
-      href: '/documents',
-      roles: ['admin', 'agent'],
-    },
-    {
-      icon: CreditCard,
-      label: 'Payments',
-      href: '/payments',
-      roles: ['admin', 'finance'],
+      icon: GraduationCap,
+      label: 'Universities',
+      href: '/universities',
+      roles: ['admin'],
     },
   ];
 
@@ -103,6 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
       case 'admin': return 'bg-medical-urgent/20 text-medical-urgent';
       case 'agent': return 'bg-primary/20 text-primary';
       case 'hospital': return 'bg-secondary/20 text-secondary';
+      case 'university': return 'bg-medical-info/20 text-medical-info';
       case 'finance': return 'bg-medical-warning/20 text-medical-warning';
       case 'client': return 'bg-medical-safe/20 text-medical-safe';
       default: return 'bg-muted text-muted-foreground';

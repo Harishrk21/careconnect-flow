@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -29,6 +29,7 @@ import {
   ArrowLeft,
   User,
   Building2,
+  GraduationCap,
   FileText,
   Clock,
   CheckCircle2,
@@ -90,12 +91,17 @@ const CaseDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getCase, hospitals, updateCaseStatus, assignHospital, addComment, addDocument, removeDocument, updateCaseData, isLoading } = useData();
+  const { getCase, hospitals, universities, updateCaseStatus, assignHospital, assignUniversity, addComment, addDocument, removeDocument, verifyDocument, updateCaseData, isLoading } = useData();
   
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('');
+  const [selectedUniversity, setSelectedUniversity] = useState<string>('');
+  const [verificationNotes, setVerificationNotes] = useState<Record<string, string>>({});
+  const [isVerificationDialogOpen, setIsVerificationDialogOpen] = useState(false);
+  const [documentToVerify, setDocumentToVerify] = useState<string | null>(null);
+  const [verificationAction, setVerificationAction] = useState<'verify' | 'reject' | null>(null);
   const [statusNote, setStatusNote] = useState('');
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CaseStatus | null>(null);
@@ -311,6 +317,38 @@ const CaseDetail: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [caseData?.comments]);
 
+  // Check if user can verify documents (admin or role reviewing at current stage)
+  const canVerifyDocuments = useMemo(() => {
+    if (!user || !caseData) return false;
+    
+    // Admin can always verify
+    if (user.role === 'admin') return true;
+    
+    // Agent can verify during agent review
+    if (user.role === 'agent' && caseData.status === 'case_agent_review') return true;
+    
+    // Hospital can verify during hospital review
+    if (user.role === 'hospital' && caseData.status === 'hospital_review') return true;
+    
+    // University can verify during university review (if we add that status)
+    if (user.role === 'university' && caseData.status === 'hospital_review') return true;
+    
+    return false;
+  }, [user, caseData]);
+
+  // Check if all required documents are verified
+  const allRequiredDocumentsVerified = useMemo(() => {
+    if (!caseData) return false;
+    
+    const requiredDocs = caseData.documents.filter(doc => 
+      REQUIRED_DOCUMENTS.includes(doc.type)
+    );
+    
+    if (requiredDocs.length === 0) return true;
+    
+    return requiredDocs.every(doc => doc.verificationStatus === 'verified');
+  }, [caseData]);
+
   const refreshCase = async () => {
     if (!id) return;
     const data = await getCase(id);
@@ -338,11 +376,47 @@ const CaseDetail: React.FC = () => {
   }
 
   const hospital = hospitals.find(h => h.id === caseData.assignedHospital);
+  const university = universities.find(u => u.id === caseData.assignedUniversity);
+  const isUniversityCase = !!caseData.assignedUniversity;
+  
+  // Helper to get context-aware preset messages
+  const getContextAwareMessages = (): string[] => {
+    if (!isUniversityCase) {
+      return CLIENT_PRESET_MESSAGES;
+    }
+    // University-specific messages
+    return [
+      "Request update on my case",
+      "I have a question about my program",
+      "When is my admission date?",
+      "I need to upload additional documents",
+      "Thank you for the update",
+      "What are the next steps?",
+      "I need help with visa process",
+      "When should I travel?",
+    ];
+  };
+  
+  // Helper to get context-aware status labels
+  const getStatusLabel = (status: CaseStatus): string => {
+    if (status === 'assigned_to_hospital') {
+      return isUniversityCase ? 'Assigned to University' : 'Assigned to Hospital';
+    }
+    if (status === 'hospital_review') {
+      return isUniversityCase ? 'University Review' : 'Hospital Review';
+    }
+    return STATUS_LABELS[status];
+  };
   
   // Helper to check if case is assigned to current hospital user (supports multiple hospitals)
   const isAssignedToCurrentHospital = user?.role === 'hospital' && 
     caseData.assignedHospital && 
     (user.hospitalIds || []).includes(caseData.assignedHospital);
+  
+  // Helper to check if case is assigned to current university user (supports multiple universities)
+  const isAssignedToCurrentUniversity = user?.role === 'university' && 
+    caseData.assignedUniversity && 
+    (user.universityIds || []).includes(caseData.assignedUniversity);
   
   // Helper to check if case belongs to current agent
   const isAssignedToCurrentAgent = user?.role === 'agent' && 
@@ -369,12 +443,12 @@ const CaseDetail: React.FC = () => {
   const uploadedDocTypes = caseData.documents.map(d => d.type);
   // Get available document types based on role and status
   const availableDocTypes = user && caseData
-    ? getAvailableDocumentTypes(user.role, caseData.status, uploadedDocTypes)
+    ? getAvailableDocumentTypes(user.role, caseData.status, uploadedDocTypes, isUniversityCase)
     : [];
 
   // Check required documents based on role and status
   const requiredDocs = user && caseData
-    ? getRequiredDocuments(user.role, caseData.status)
+    ? getRequiredDocuments(user.role, caseData.status, isUniversityCase)
     : [];
   const missingRequired = requiredDocs.filter(
     type => !uploadedDocTypes.includes(type)
@@ -628,13 +702,24 @@ const CaseDetail: React.FC = () => {
 
   // Action descriptions for better UX
   const getActionDescription = (status: CaseStatus): string => {
+    const isUniCase = isUniversityCase;
+    const agentType = isUniCase ? 'university agent' : 'hospital agent';
+    
     const descriptions: Record<CaseStatus, string> = {
       new: 'Start reviewing and uploading required documents',
       case_agent_review: 'Review case details and ensure all documents are uploaded',
-      admin_review: 'Admin will validate the case and assign to hospital agent',
-      assigned_to_hospital: 'Case has been assigned to a hospital agent for review',
-      hospital_review: 'Hospital agent is reviewing the case',
-      case_accepted: 'Hospital agent has accepted the case',
+      admin_review: isUniCase 
+        ? 'Admin will validate the case and assign to university agent'
+        : 'Admin will validate the case and assign to hospital agent',
+      assigned_to_hospital: isUniCase
+        ? 'Case has been assigned to a university agent for review'
+        : 'Case has been assigned to a hospital agent for review',
+      hospital_review: isUniCase
+        ? 'University agent is reviewing the case'
+        : 'Hospital agent is reviewing the case',
+      case_accepted: isUniCase
+        ? 'University agent has accepted the case'
+        : 'Hospital agent has accepted the case',
       case_rejected: 'Case has been rejected and returned for review',
       treatment_plan_uploaded: 'Treatment plan has been uploaded by hospital',
       pass_travel_documentation: 'Travel documentation has been approved',
@@ -691,8 +776,12 @@ const CaseDetail: React.FC = () => {
       requirements.push('Treatment plan must be uploaded first');
     }
     
-    if (status === 'assigned_to_hospital' && !caseData?.assignedHospital) {
-      requirements.push('Hospital agent must be assigned first');
+    if (status === 'assigned_to_hospital') {
+      if (isUniversityCase && !caseData?.assignedUniversity) {
+        requirements.push('University agent must be assigned first');
+      } else if (!isUniversityCase && !caseData?.assignedHospital) {
+        requirements.push('Hospital agent must be assigned first');
+      }
     }
     
     if (status === 'visa_copy_uploaded' && caseData?.status !== 'visa_approved') {
@@ -731,6 +820,25 @@ const CaseDetail: React.FC = () => {
       return;
     }
     
+    // Check if all required documents are verified before proceeding to next stage
+    if (caseData.status === 'case_agent_review' && pendingStatus === 'admin_review' && !allRequiredDocumentsVerified) {
+      toast({
+        title: 'Documents Not Verified',
+        description: 'All required documents must be verified before proceeding to admin review',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (caseData.status === 'admin_review' && pendingStatus === 'assigned_to_hospital' && !allRequiredDocumentsVerified) {
+      toast({
+        title: 'Documents Not Verified',
+        description: 'All required documents must be verified before assigning to hospital',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     if (pendingStatus === 'treatment_plan_uploaded' && !caseData.treatmentPlan) {
       toast({
         title: 'Treatment Plan Required',
@@ -740,13 +848,22 @@ const CaseDetail: React.FC = () => {
       return;
     }
     
-    if (pendingStatus === 'assigned_to_hospital' && !caseData.assignedHospital) {
-      toast({
-        title: 'Hospital Required',
-        description: 'Please assign a hospital before changing status',
-        variant: 'destructive',
-      });
-      return;
+    if (pendingStatus === 'assigned_to_hospital') {
+      if (isUniversityCase && !caseData.assignedUniversity) {
+        toast({
+          title: 'University Required',
+          description: 'Please assign a university before changing status',
+          variant: 'destructive',
+        });
+        return;
+      } else if (!isUniversityCase && !caseData.assignedHospital) {
+        toast({
+          title: 'Hospital Required',
+          description: 'Please assign a hospital before changing status',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
     
     setIsSavingStatus(true);
@@ -804,7 +921,7 @@ const CaseDetail: React.FC = () => {
       
       toast({
         title: 'Status Updated Successfully',
-        description: `Case status changed from "${STATUS_LABELS[caseData.status]}" to "${STATUS_LABELS[pendingStatus]}"`,
+        description: `Case status changed from "${getStatusLabel(caseData.status)}" to "${getStatusLabel(pendingStatus)}"`,
       });
       
       // Close dialog after success
@@ -837,6 +954,26 @@ const CaseDetail: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to assign hospital',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleAssignUniversity = async () => {
+    if (!selectedUniversity || !id) return;
+    
+    try {
+      await assignUniversity(id, selectedUniversity);
+      await refreshCase();
+      toast({
+        title: 'University Assigned',
+        description: 'Case has been assigned to the selected university',
+      });
+      setSelectedUniversity('');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to assign university',
         variant: 'destructive',
       });
     }
@@ -1078,6 +1215,39 @@ const CaseDetail: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to remove document',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleVerifyDocument = async (docId: string, status: 'verified' | 'rejected') => {
+    if (!id) return;
+    
+    const notes = verificationNotes[docId] || '';
+    if (status === 'rejected' && !notes.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please provide a reason for rejecting the document',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    try {
+      await verifyDocument(id, docId, status, notes);
+      await refreshCase();
+      setVerificationNotes({ ...verificationNotes, [docId]: '' });
+      setIsVerificationDialogOpen(false);
+      setDocumentToVerify(null);
+      setVerificationAction(null);
+      toast({
+        title: status === 'verified' ? 'Document Verified' : 'Document Rejected',
+        description: `Document has been ${status === 'verified' ? 'verified' : 'rejected'}`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: `Failed to ${status === 'verified' ? 'verify' : 'reject'} document`,
         variant: 'destructive',
       });
     }
@@ -1522,7 +1692,8 @@ const CaseDetail: React.FC = () => {
     const availableDocs = getAvailableDocumentTypes(
       user.role,
       caseData.status,
-      uploadedDocTypes
+      uploadedDocTypes,
+      isUniversityCase
     );
     
     // Can edit if there are available documents to upload
@@ -1566,7 +1737,7 @@ const CaseDetail: React.FC = () => {
             variant="outline" 
             className={cn('text-sm px-3 py-1', getStatusBadgeClass(caseData.status))}
           >
-            {STATUS_LABELS[caseData.status]}
+            {getStatusLabel(caseData.status)}
           </Badge>
         </div>
       </div>
@@ -1582,14 +1753,14 @@ const CaseDetail: React.FC = () => {
             <div className="progress-bar-fill" style={{ width: `${progressPercentage}%` }} />
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Current Stage: {STATUS_LABELS[caseData.status]} ({currentStatusIndex + 1} of {STATUS_FLOW.length})
+            Current Stage: {getStatusLabel(caseData.status)} ({currentStatusIndex + 1} of {STATUS_FLOW.length})
           </p>
           
           {/* Compact Workflow Stages */}
           <div className="mt-4 pt-4 border-t border-border">
             <details className="group">
               <summary className="cursor-pointer text-sm font-medium text-foreground hover:text-primary transition-colors">
-                View Complete Workflow ({STATUS_FLOW.length} stages)
+                View Complete {isUniversityCase ? 'University' : 'Hospital'} Workflow ({STATUS_FLOW.length} stages)
               </summary>
               <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
                 {STATUS_FLOW.map((status, index) => {
@@ -1623,7 +1794,7 @@ const CaseDetail: React.FC = () => {
                           isCompleted && 'text-foreground',
                           isUpcoming && 'text-muted-foreground'
                         )}>
-                          {STATUS_LABELS[status]}
+                          {getStatusLabel(status)}
                         </p>
                         {statusHistoryEntry && (
                           <p className="text-xs text-muted-foreground">
@@ -1734,7 +1905,7 @@ const CaseDetail: React.FC = () => {
                                         'font-semibold text-sm',
                                         canProceed ? 'text-foreground' : 'text-muted-foreground'
                                       )}>
-                                        {STATUS_LABELS[status]}
+                                        {getStatusLabel(status)}
                                       </h4>
                                       {!canProceed && (
                                         <Info className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1778,11 +1949,12 @@ const CaseDetail: React.FC = () => {
                   });
                 })()}
                 
-                {/* Hospital Assignment (Admin only) - Hospital refers to Sudaind's hospital-related agent */}
+                {/* Hospital/University Assignment (Admin only) */}
                 {user?.role === 'admin' && 
                  (caseData.status === 'admin_review' || caseData.status === 'case_rejected') && 
-                 !caseData.assignedHospital && (
-                  <div className="mt-4 pt-4 border-t border-border">
+                 !caseData.assignedHospital && !caseData.assignedUniversity && (
+                  <div className="mt-4 pt-4 border-t border-border space-y-4">
+                    {/* Show both options when neither is assigned, so admin can choose */}
                     <div className="p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
                       <div className="flex items-center gap-2 mb-3">
                         <Building2 className="w-5 h-5 text-primary" />
@@ -1806,6 +1978,36 @@ const CaseDetail: React.FC = () => {
                           onClick={handleAssignHospital} 
                           disabled={!selectedHospital}
                           className="bg-gradient-primary hover:opacity-90 shadow-md"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          Assign
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-medical-info/10 to-medical-info/5 border border-medical-info/20">
+                      <div className="flex items-center gap-2 mb-3">
+                        <GraduationCap className="w-5 h-5 text-medical-info" />
+                        <h4 className="font-semibold text-sm text-foreground">Assign University Agent</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Select value={selectedUniversity} onValueChange={setSelectedUniversity}>
+                          <SelectTrigger className="flex-1 bg-background">
+                            <GraduationCap className="w-4 h-4 mr-2" />
+                            <SelectValue placeholder="Select University Agent to Assign" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-popover border-border">
+                            {universities.map((u) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.name} - {u.city}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          onClick={handleAssignUniversity} 
+                          disabled={!selectedUniversity}
+                          className="bg-gradient-to-r from-medical-info to-medical-info/80 hover:opacity-90 shadow-md"
                         >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
                           Assign
@@ -1877,7 +2079,7 @@ const CaseDetail: React.FC = () => {
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Current Status</p>
                     <Badge variant="outline" className={getStatusBadgeClass(caseData.status)}>
-                      {STATUS_LABELS[caseData.status]}
+                      {getStatusLabel(caseData.status)}
                     </Badge>
                   </div>
                 </div>
@@ -1897,7 +2099,7 @@ const CaseDetail: React.FC = () => {
                       variant="outline" 
                       className={pendingStatus ? getStatusBadgeClass(pendingStatus) : ''}
                     >
-                      {pendingStatus && STATUS_LABELS[pendingStatus]}
+                      {pendingStatus && getStatusLabel(pendingStatus)}
                     </Badge>
                   </div>
                 </div>
@@ -2283,7 +2485,7 @@ const CaseDetail: React.FC = () => {
               <p className="text-xs font-medium text-foreground mb-2">Current Case Status</p>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={getStatusBadgeClass(caseData.status)}>
-                  {STATUS_LABELS[caseData.status]}
+                  {getStatusLabel(caseData.status)}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {visaData.status === 'approved' && caseData.status !== 'visa_approved' && 
@@ -2339,7 +2541,7 @@ const CaseDetail: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div className="p-4 bg-muted/30 rounded-lg">
-              <p className="text-sm font-medium text-foreground mb-1">Patient Information</p>
+              <p className="text-sm font-medium text-foreground mb-1">{isUniversityCase ? 'Student Information' : 'Patient Information'}</p>
               <p className="text-xs text-muted-foreground">
                 <strong>Name:</strong> {caseData?.clientInfo.name} | <strong>Passport:</strong> {caseData?.clientInfo.passport} | <strong>Nationality:</strong> {caseData?.clientInfo.nationality}
               </p>
@@ -2433,7 +2635,7 @@ const CaseDetail: React.FC = () => {
               <p className="text-xs font-medium text-foreground mb-2">Current Case Status</p>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={getStatusBadgeClass(caseData?.status || 'new')}>
-                  {caseData?.status ? STATUS_LABELS[caseData.status] : 'Unknown'}
+                  {caseData?.status ? getStatusLabel(caseData.status) : 'Unknown'}
                 </Badge>
                 {caseData?.status === 'admit_format_uploaded' && (
                   <span className="text-xs text-muted-foreground">
@@ -2591,7 +2793,7 @@ const CaseDetail: React.FC = () => {
               <p className="text-xs font-medium text-foreground mb-2">Current Case Status</p>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={getStatusBadgeClass(caseData?.status || 'new')}>
-                  {caseData?.status ? STATUS_LABELS[caseData.status] : 'Unknown'}
+                  {caseData?.status ? getStatusLabel(caseData.status) : 'Unknown'}
                 </Badge>
                 {caseData?.status === 'final_report_medicine' && (
                   <span className="text-xs text-muted-foreground">
@@ -2842,7 +3044,7 @@ const CaseDetail: React.FC = () => {
               <p className="text-xs font-medium text-foreground mb-2">Current Case Status</p>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className={getStatusBadgeClass(caseData?.status || 'new')}>
-                  {caseData?.status ? STATUS_LABELS[caseData.status] : 'Unknown'}
+                  {caseData?.status ? getStatusLabel(caseData.status) : 'Unknown'}
                 </Badge>
                 {caseData?.status === 'invoice_uploaded' && (
                   <span className="text-xs text-muted-foreground">
@@ -2907,12 +3109,12 @@ const CaseDetail: React.FC = () => {
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            {/* Patient Information */}
+            {/* Patient/Student Information */}
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                   <User className="w-5 h-5 text-primary" />
-                  Patient Information
+                  {isUniversityCase ? 'Student Information' : 'Patient Information'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2936,8 +3138,12 @@ const CaseDetail: React.FC = () => {
                 </div>
                 <div className="pt-2 border-t border-border">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <Stethoscope className="w-4 h-4" />
-                    Medical Condition
+                    {isUniversityCase ? (
+                      <GraduationCap className="w-4 h-4" />
+                    ) : (
+                      <Stethoscope className="w-4 h-4" />
+                    )}
+                    {isUniversityCase ? 'Course/Program of Interest' : 'Medical Condition'}
                   </div>
                   <p className="font-medium text-foreground">{caseData.clientInfo.condition}</p>
                 </div>
@@ -2958,16 +3164,45 @@ const CaseDetail: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Hospital & Treatment */}
+            {/* Hospital/University & Treatment */}
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Building2 className="w-5 h-5 text-secondary" />
-                  Hospital Agent & Treatment
+                  {isUniversityCase ? (
+                    <GraduationCap className="w-5 h-5 text-medical-info" />
+                  ) : (
+                    <Building2 className="w-5 h-5 text-secondary" />
+                  )}
+                  {isUniversityCase ? 'University Agent & Program' : 'Hospital Agent & Treatment'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {hospital ? (
+                {isUniversityCase && university ? (
+                  <>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Assigned University Agent</p>
+                      <p className="font-semibold text-foreground">{university.name}</p>
+                      <p className="text-sm text-muted-foreground">{university.city}, {university.state}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {university.accreditation.map((acc) => (
+                        <Badge key={acc} variant="outline" className="text-xs">
+                          {acc}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="pt-2 border-t border-border">
+                      <p className="text-xs text-muted-foreground mb-1">Available Courses</p>
+                      <div className="flex flex-wrap gap-1">
+                        {university.courses.slice(0, 4).map((course) => (
+                          <Badge key={course} variant="secondary" className="text-xs">
+                            {course}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : hospital ? (
                   <>
                     <div>
                       <p className="text-xs text-muted-foreground">Assigned Hospital Agent</p>
@@ -2994,11 +3229,21 @@ const CaseDetail: React.FC = () => {
                   </>
                 ) : (
                   <div className="text-center py-6 text-muted-foreground">
-                    <Building2 className="w-12 h-12 mx-auto mb-2 opacity-30" />
-                    <p>No hospital agent assigned yet</p>
+                    {isUniversityCase ? (
+                      <>
+                        <GraduationCap className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                        <p>No university agent assigned yet</p>
+                      </>
+                    ) : (
+                      <>
+                        <Building2 className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                        <p>{isUniversityCase ? 'No university agent assigned yet' : 'No hospital agent assigned yet'}</p>
+                      </>
+                    )}
                   </div>
                 )}
                 
+                {!isUniversityCase && (
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-muted-foreground">Treatment Plan</p>
@@ -3051,6 +3296,7 @@ const CaseDetail: React.FC = () => {
                     </div>
                   )}
                 </div>
+                )}
               </CardContent>
             </Card>
 
@@ -3391,6 +3637,42 @@ const CaseDetail: React.FC = () => {
                 </div>
               )}
 
+              {/* Document Verification Status Warning */}
+              {caseData.documents.length > 0 && canVerifyDocuments && !allRequiredDocumentsVerified && (
+                <div className="p-3 bg-medical-warning/10 border border-medical-warning/20 rounded-lg">
+                  <p className="text-sm font-medium text-medical-warning flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Document Verification Required:
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    All required documents must be verified before proceeding to the next stage.
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {caseData.documents
+                      .filter(doc => REQUIRED_DOCUMENTS.includes(doc.type))
+                      .map((doc) => (
+                        <div key={doc.id} className="text-sm text-muted-foreground flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-medical-warning" />
+                          {DOCUMENT_TYPE_LABELS[doc.type]} - 
+                          {doc.verificationStatus === 'verified' ? (
+                            <Badge className="bg-medical-safe/20 text-medical-safe border-0 text-xs ml-1">
+                              Verified
+                            </Badge>
+                          ) : doc.verificationStatus === 'rejected' ? (
+                            <Badge variant="destructive" className="text-xs ml-1">
+                              Rejected
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs ml-1">
+                              Pending
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
               {/* Uploaded Documents List */}
               <div className="space-y-2">
                 {caseData.documents.length > 0 ? (
@@ -3417,9 +3699,26 @@ const CaseDetail: React.FC = () => {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {REQUIRED_DOCUMENTS.includes(doc.type) && (
                           <Badge variant="outline" className="text-xs">Required</Badge>
+                        )}
+                        {doc.verificationStatus === 'verified' && (
+                          <Badge className="bg-medical-safe/20 text-medical-safe border-0 text-xs">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Verified
+                          </Badge>
+                        )}
+                        {doc.verificationStatus === 'rejected' && (
+                          <Badge variant="destructive" className="text-xs">
+                            <X className="w-3 h-3 mr-1" />
+                            Rejected
+                          </Badge>
+                        )}
+                        {(!doc.verificationStatus || doc.verificationStatus === 'pending') && canVerifyDocuments && (
+                          <Badge variant="outline" className="text-xs text-medical-warning">
+                            Pending Review
+                          </Badge>
                         )}
                         <Badge variant="secondary" className="text-xs">
                           {new Date(doc.uploadedAt).toLocaleDateString()}
@@ -3474,6 +3773,36 @@ const CaseDetail: React.FC = () => {
                             </Button>
                           </>
                         )}
+                        {canVerifyDocuments && (!doc.verificationStatus || doc.verificationStatus === 'pending') && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDocumentToVerify(doc.id);
+                                setVerificationAction('verify');
+                                setIsVerificationDialogOpen(true);
+                              }}
+                              className="text-medical-safe hover:text-medical-safe"
+                              title="Verify document"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setDocumentToVerify(doc.id);
+                                setVerificationAction('reject');
+                                setIsVerificationDialogOpen(true);
+                              }}
+                              className="text-destructive hover:text-destructive"
+                              title="Reject document"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         {canEditDocuments && (
                           <Button
                             variant="ghost"
@@ -3520,7 +3849,7 @@ const CaseDetail: React.FC = () => {
                 )}
               </CardTitle>
               <CardDescription className="text-xs">
-                Chat with the case team
+                Chat with the {isUniversityCase ? 'university' : 'hospital'} team
               </CardDescription>
             </CardHeader>
             
@@ -3622,7 +3951,7 @@ const CaseDetail: React.FC = () => {
                 <div className="mb-3">
                   <p className="text-xs text-muted-foreground mb-2 px-1">Quick replies:</p>
                   <div className="flex flex-wrap gap-2">
-                    {CLIENT_PRESET_MESSAGES.map((msg, index) => (
+                    {getContextAwareMessages().map((msg, index) => (
                       <Button
                         key={index}
                         variant="outline"
@@ -3680,6 +4009,66 @@ const CaseDetail: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Document Verification Dialog */}
+      <Dialog open={isVerificationDialogOpen} onOpenChange={setIsVerificationDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">
+              {verificationAction === 'verify' ? 'Verify Document' : 'Reject Document'}
+            </DialogTitle>
+            <DialogDescription>
+              {verificationAction === 'verify' 
+                ? 'Confirm that this document meets all requirements and is valid.'
+                : 'Please provide a reason for rejecting this document.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {verificationAction === 'reject' && (
+              <div className="space-y-2">
+                <Label htmlFor="verification-notes">Rejection Reason *</Label>
+                <Textarea
+                  id="verification-notes"
+                  value={verificationNotes[documentToVerify || ''] || ''}
+                  onChange={(e) => setVerificationNotes({
+                    ...verificationNotes,
+                    [documentToVerify || '']: e.target.value
+                  })}
+                  placeholder="Explain why this document is being rejected..."
+                  className="min-h-[100px]"
+                />
+              </div>
+            )}
+            {verificationAction === 'verify' && (
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  By verifying this document, you confirm that it is complete, valid, and meets all requirements.
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsVerificationDialogOpen(false);
+              setDocumentToVerify(null);
+              setVerificationAction(null);
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (documentToVerify && verificationAction) {
+                  handleVerifyDocument(documentToVerify, verificationAction === 'verify' ? 'verified' : 'rejected');
+                }
+              }}
+              disabled={verificationAction === 'reject' && !verificationNotes[documentToVerify || '']?.trim()}
+              className={verificationAction === 'verify' ? 'bg-gradient-primary' : 'bg-destructive hover:bg-destructive/90'}
+            >
+              {verificationAction === 'verify' ? 'Verify' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

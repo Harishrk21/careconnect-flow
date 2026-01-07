@@ -31,7 +31,7 @@ const FinanceDashboard: React.FC = () => {
   const { user } = useAuth();
   const { cases, isLoading } = useData();
 
-  // Filter payment-related cases
+  // Filter payment-related cases (both hospital and university cases)
   const paymentCases = useMemo(() => {
     return cases.filter(c => 
       c.status === 'visa_processing_payments' || 
@@ -83,6 +83,18 @@ const FinanceDashboard: React.FC = () => {
   const getStatusBadgeClass = (status: string) => {
     const colorClass = STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'status-neutral';
     return colorClass;
+  };
+
+  // Helper to get context-aware status labels
+  const getStatusLabel = (status: string, caseItem?: Case): string => {
+    const isUniCase = caseItem ? !!caseItem.assignedUniversity : false;
+    if (status === 'assigned_to_hospital') {
+      return isUniCase ? 'Assigned to University' : 'Assigned to Hospital';
+    }
+    if (status === 'hospital_review') {
+      return isUniCase ? 'University Review' : 'Hospital Review';
+    }
+    return STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status;
   };
 
   if (isLoading) {
@@ -383,17 +395,17 @@ const FinanceDashboard: React.FC = () => {
                           <p className="text-sm font-medium text-foreground">{caseItem.id}</p>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Patient Name</p>
+                          <p className="text-xs text-muted-foreground mb-1">{caseItem.assignedUniversity ? 'Student Name' : 'Patient Name'}</p>
                           <p className="text-sm font-medium text-foreground">{caseItem.clientInfo.name}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">Current Status</p>
                           <Badge variant="outline" className={getStatusBadgeClass(caseItem.status)}>
-                            {STATUS_LABELS[caseItem.status]}
+                            {getStatusLabel(caseItem.status, caseItem)}
                           </Badge>
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Medical Condition</p>
+                          <p className="text-xs text-muted-foreground mb-1">{caseItem.assignedUniversity ? 'Course/Program' : 'Medical Condition'}</p>
                           <p className="text-sm text-foreground">{caseItem.clientInfo.condition}</p>
                         </div>
                         <div>

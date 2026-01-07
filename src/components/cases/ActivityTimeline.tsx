@@ -18,9 +18,22 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   showActivityLog = true,
   compact = false,
 }) => {
+  const isUniversityCase = !!caseData.assignedUniversity;
+  
   const getStatusBadgeClass = (status: string) => {
     const colorClass = STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'status-neutral';
     return colorClass;
+  };
+
+  // Helper to get context-aware status labels
+  const getStatusLabel = (status: string): string => {
+    if (status === 'assigned_to_hospital') {
+      return isUniversityCase ? 'Assigned to University' : 'Assigned to Hospital';
+    }
+    if (status === 'hospital_review') {
+      return isUniversityCase ? 'University Review' : 'Hospital Review';
+    }
+    return STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status;
   };
 
   return (
@@ -58,7 +71,7 @@ const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     <div className={cn('bg-muted/30 rounded-lg p-3', compact && 'p-2')}>
                       <div className="flex items-center justify-between mb-1">
                         <Badge variant="outline" className={cn(getStatusBadgeClass(entry.status), compact && 'text-xs')}>
-                          {STATUS_LABELS[entry.status]}
+                          {getStatusLabel(entry.status)}
                         </Badge>
                         <span className={cn('text-xs text-muted-foreground', compact && 'text-[10px]')}>
                           {new Date(entry.timestamp).toLocaleString()}

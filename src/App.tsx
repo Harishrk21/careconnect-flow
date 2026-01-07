@@ -16,8 +16,7 @@ import ClientsList from "./pages/clients/ClientsList";
 import CreateClient from "./pages/clients/CreateClient";
 import UserManagement from "./pages/UserManagement";
 import HospitalManagement from "./pages/HospitalManagement";
-import Documents from "./pages/Documents";
-import Payments from "./pages/Payments";
+import UniversityManagement from "./pages/UniversityManagement";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -49,22 +48,32 @@ const AppRoutes: React.FC = () => {
   
   return (
     <Routes>
+      {/* Root route - show login if not authenticated, redirect if authenticated */}
+      <Route 
+        path="/" 
+        element={
+          isAuthenticated && user?.passwordChanged 
+            ? <Navigate to="/dashboard" replace /> 
+            : isAuthenticated && !user?.passwordChanged
+            ? <Navigate to="/reset-password" replace />
+            : <Login />
+        } 
+      />
       <Route path="/login" element={isAuthenticated && user?.passwordChanged ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/reset-password" element={<PasswordReset />} />
-      <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        <Route path="cases" element={<CasesList />} />
-        <Route path="cases/new" element={<CreateCase />} />
-        <Route path="cases/:id" element={<CaseDetail />} />
-        <Route path="clients" element={<ClientsList />} />
-        <Route path="clients/new" element={<CreateClient />} />
-        <Route path="users" element={<UserManagement />} />
-        <Route path="hospitals" element={<HospitalManagement />} />
-        <Route path="documents" element={<Documents />} />
-        <Route path="payments" element={<Payments />} />
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="settings" element={<Settings />} />
+      {/* Protected routes with MainLayout - using explicit paths to avoid conflict with root route */}
+      <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/cases" element={<CasesList />} />
+        <Route path="/cases/new" element={<CreateCase />} />
+        <Route path="/cases/:id" element={<CaseDetail />} />
+        <Route path="/clients" element={<ClientsList />} />
+        <Route path="/clients/new" element={<CreateClient />} />
+        <Route path="/users" element={<UserManagement />} />
+        <Route path="/hospitals" element={<HospitalManagement />} />
+        <Route path="/universities" element={<UniversityManagement />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import type { User, Case, Hospital, Notification } from '@/types';
+import type { User, Case, Hospital, University, Notification } from '@/types';
 
 interface SudIndDB extends DBSchema {
   users: {
@@ -10,11 +10,15 @@ interface SudIndDB extends DBSchema {
   cases: {
     key: string;
     value: Case;
-    indexes: { 'by-client': string; 'by-agent': string; 'by-hospital': string; 'by-status': string };
+    indexes: { 'by-client': string; 'by-agent': string; 'by-hospital': string; 'by-university': string; 'by-status': string };
   };
   hospitals: {
     key: string;
     value: Hospital;
+  };
+  universities: {
+    key: string;
+    value: University;
   };
   notifications: {
     key: string;
@@ -28,50 +32,84 @@ interface SudIndDB extends DBSchema {
 }
 
 const DB_NAME = 'sudind-db';
-const DB_VERSION = 1;
+const DB_VERSION = 13;
 
 let dbInstance: IDBPDatabase<SudIndDB> | null = null;
 
 export const initDB = async (): Promise<IDBPDatabase<SudIndDB>> => {
   if (dbInstance) return dbInstance;
 
-  dbInstance = await openDB<SudIndDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      // Users store
-      if (!db.objectStoreNames.contains('users')) {
-        const userStore = db.createObjectStore('users', { keyPath: 'id' });
-        userStore.createIndex('by-username', 'username', { unique: true });
-        userStore.createIndex('by-role', 'role');
-      }
+  try {
+    dbInstance = await openDB<SudIndDB>(DB_NAME, DB_VERSION, {
+      upgrade(db, oldVersion, newVersion) {
+        console.log(`Database upgrading from version ${oldVersion} to ${newVersion}`);
+        
+        // Users store
+        if (!db.objectStoreNames.contains('users')) {
+          const userStore = db.createObjectStore('users', { keyPath: 'id' });
+          userStore.createIndex('by-username', 'username', { unique: true });
+          userStore.createIndex('by-role', 'role');
+        }
 
-      // Cases store
-      if (!db.objectStoreNames.contains('cases')) {
-        const caseStore = db.createObjectStore('cases', { keyPath: 'id' });
-        caseStore.createIndex('by-client', 'clientId');
-        caseStore.createIndex('by-agent', 'agentId');
-        caseStore.createIndex('by-hospital', 'assignedHospital');
-        caseStore.createIndex('by-status', 'status');
-      }
+        // Cases store
+        if (!db.objectStoreNames.contains('cases')) {
+          const caseStore = db.createObjectStore('cases', { keyPath: 'id' });
+          caseStore.createIndex('by-client', 'clientId');
+          caseStore.createIndex('by-agent', 'agentId');
+          caseStore.createIndex('by-hospital', 'assignedHospital');
+          caseStore.createIndex('by-status', 'status');
+        } else if (oldVersion < 6) {
+          // Upgrade: add university index for version 6+
+          const caseStore = db.transaction('cases', 'readwrite').objectStore('cases');
+          if (!caseStore.indexNames.contains('by-university')) {
+            try {
+              caseStore.createIndex('by-university', 'assignedUniversity');
+              console.log('Added by-university index to cases store');
+            } catch (error) {
+              console.warn('Could not create by-university index (may already exist):', error);
+            }
+          }
+        }
 
-      // Hospitals store
-      if (!db.objectStoreNames.contains('hospitals')) {
-        db.createObjectStore('hospitals', { keyPath: 'id' });
-      }
+        // Hospitals store
+        if (!db.objectStoreNames.contains('hospitals')) {
+          db.createObjectStore('hospitals', { keyPath: 'id' });
+        }
 
-      // Notifications store
-      if (!db.objectStoreNames.contains('notifications')) {
-        const notifStore = db.createObjectStore('notifications', { keyPath: 'id' });
-        notifStore.createIndex('by-user', 'userId');
-      }
+        // Universities store
+        if (!db.objectStoreNames.contains('universities')) {
+          db.createObjectStore('universities', { keyPath: 'id' });
+        }
 
-      // Settings store
-      if (!db.objectStoreNames.contains('settings')) {
-        db.createObjectStore('settings', { keyPath: 'key' });
-      }
-    },
-  });
+        // Notifications store
+        if (!db.objectStoreNames.contains('notifications')) {
+          const notifStore = db.createObjectStore('notifications', { keyPath: 'id' });
+          notifStore.createIndex('by-user', 'userId');
+        }
 
-  return dbInstance;
+        // Settings store
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+      },
+      blocked() {
+        console.warn('Database upgrade blocked - another tab may be open');
+      },
+      blocking() {
+        console.warn('Database upgrade blocking - closing connections');
+      },
+    });
+
+    console.log('Database initialized successfully');
+    return dbInstance;
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    // Try to delete and recreate if there's a version conflict
+    if (error instanceof Error && error.name === 'VersionError') {
+      console.warn('Version conflict detected. You may need to clear IndexedDB manually.');
+    }
+    throw error;
+  }
 };
 
 // Users operations
@@ -192,6 +230,74 @@ export const updateHospital = async (hospital: Hospital): Promise<void> => {
 export const deleteHospital = async (id: string): Promise<void> => {
   const db = await initDB();
   await db.delete('hospitals', id);
+};
+
+// Universities operations
+export const getAllUniversities = async (): Promise<University[]> => {
+  try {
+    const db = await initDB();
+    // Check if store exists, if not return empty array
+    if (!db.objectStoreNames.contains('universities')) {
+      console.warn('Universities store does not exist yet');
+      return [];
+    }
+    return db.getAll('universities');
+  } catch (error) {
+    console.error('Error getting universities:', error);
+    return [];
+  }
+};
+
+export const getUniversityById = async (id: string): Promise<University | undefined> => {
+  try {
+    const db = await initDB();
+    if (!db.objectStoreNames.contains('universities')) {
+      return undefined;
+    }
+    return db.get('universities', id);
+  } catch (error) {
+    console.error('Error getting university:', error);
+    return undefined;
+  }
+};
+
+export const addUniversity = async (university: University): Promise<void> => {
+  try {
+    const db = await initDB();
+    if (!db.objectStoreNames.contains('universities')) {
+      throw new Error('Universities store does not exist. Database may need to be upgraded.');
+    }
+    await db.put('universities', university);
+  } catch (error) {
+    console.error('Error adding university:', error);
+    throw error;
+  }
+};
+
+export const updateUniversity = async (university: University): Promise<void> => {
+  try {
+    const db = await initDB();
+    if (!db.objectStoreNames.contains('universities')) {
+      throw new Error('Universities store does not exist. Database may need to be upgraded.');
+    }
+    await db.put('universities', university);
+  } catch (error) {
+    console.error('Error updating university:', error);
+    throw error;
+  }
+};
+
+export const deleteUniversity = async (id: string): Promise<void> => {
+  try {
+    const db = await initDB();
+    if (!db.objectStoreNames.contains('universities')) {
+      throw new Error('Universities store does not exist. Database may need to be upgraded.');
+    }
+    await db.delete('universities', id);
+  } catch (error) {
+    console.error('Error deleting university:', error);
+    throw error;
+  }
 };
 
 // Notifications operations

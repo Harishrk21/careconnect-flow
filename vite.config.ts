@@ -27,5 +27,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
+    // Ensure public folder files are copied
+    copyPublicDir: true,
   },
 }));

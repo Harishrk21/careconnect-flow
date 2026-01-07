@@ -8,17 +8,30 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Loader2, UserPlus, Building2, GraduationCap } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 const CreateCase: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { createCase, createUser, users } = useData();
+  const { createCase, createUser, users, hospitals, universities } = useData();
   const [loading, setLoading] = useState(false);
   const [clientMode, setClientMode] = useState<'existing' | 'new'>('existing');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  // Determine case type based on agent type
+  const agentCaseType = user?.role === 'agent' && user?.agentType 
+    ? user.agentType 
+    : 'hospital';
+  
+  const [caseType, setCaseType] = useState<'hospital' | 'university'>(agentCaseType);
+  
+  // Update case type when user changes (shouldn't happen, but safety check)
+  useEffect(() => {
+    if (user?.role === 'agent' && user?.agentType) {
+      setCaseType(user.agentType);
+    }
+  }, [user]);
 
   // Check if clientId is provided in URL
   useEffect(() => {
@@ -127,6 +140,8 @@ const CreateCase: React.FC = () => {
           email: formData.attenderEmail,
         } : undefined,
         priority: formData.priority as 'low' | 'medium' | 'high' | 'urgent',
+        assignedHospital: caseType === 'hospital' ? undefined : undefined,
+        assignedUniversity: caseType === 'university' ? undefined : undefined,
       });
       
       toast({ 
@@ -230,25 +245,97 @@ const CreateCase: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Case Type Selection - Only show for admin, hide for agents (they have fixed type) */}
+        {user?.role === 'admin' && (
         <Card className="card-elevated">
-          <CardHeader><CardTitle className="text-foreground">Case Information</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-foreground">Case Type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <Button
+                type="button"
+                variant={caseType === 'hospital' ? 'default' : 'outline'}
+                onClick={() => setCaseType('hospital')}
+                className={caseType === 'hospital' ? 'bg-gradient-primary' : ''}
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                Hospital Case
+              </Button>
+              <Button
+                type="button"
+                variant={caseType === 'university' ? 'default' : 'outline'}
+                onClick={() => setCaseType('university')}
+                className={caseType === 'university' ? 'bg-gradient-to-r from-medical-info to-medical-info/80' : ''}
+              >
+                <GraduationCap className="w-4 h-4 mr-2" />
+                University Case
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {caseType === 'hospital' 
+                ? 'For medical treatment cases' 
+                : 'For university education cases'}
+            </p>
+          </CardContent>
+        </Card>
+        )}
+
+        {/* Show agent type info for agents */}
+        {user?.role === 'agent' && user?.agentType && (
+          <Card className="card-elevated">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {user.agentType === 'hospital' ? (
+                  <>
+                    <Building2 className="w-4 h-4" />
+                    <span>You are a Hospital Agent. You can only create hospital cases.</span>
+                  </>
+                ) : (
+                  <>
+                    <GraduationCap className="w-4 h-4" />
+                    <span>You are a University Agent. You can only create university cases.</span>
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="text-foreground">
+              {caseType === 'hospital' ? 'Case Information' : 'Student & Program Information'}
+            </CardTitle>
+          </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             {clientMode === 'new' && (
               <>
-            <div className="space-y-2"><Label>Full Name *</Label><Input value={formData.patientName} onChange={e => updateField('patientName', e.target.value)} required /></div>
+            <div className="space-y-2">
+              <Label>{caseType === 'hospital' ? 'Patient Name *' : 'Student Name *'}</Label>
+              <Input value={formData.patientName} onChange={e => updateField('patientName', e.target.value)} required />
+            </div>
               </>
             )}
             <div className="space-y-2"><Label>Date of Birth</Label><Input type="date" value={formData.dob} onChange={e => updateField('dob', e.target.value)} /></div>
             <div className="space-y-2"><Label>Passport Number</Label><Input value={formData.passport} onChange={e => updateField('passport', e.target.value)} /></div>
             <div className="space-y-2"><Label>Nationality</Label><Input value={formData.nationality} onChange={e => updateField('nationality', e.target.value)} /></div>
             <div className="md:col-span-2 space-y-2">
-              <Label>Medical Condition *</Label>
+              <Label>{caseType === 'hospital' ? 'Medical Condition *' : 'Course/Program of Interest *'}</Label>
               <Textarea 
                 value={formData.condition} 
                 onChange={e => updateField('condition', e.target.value)} 
                 required 
-                placeholder="Describe the medical condition requiring treatment"
+                placeholder={caseType === 'hospital' 
+                  ? "Describe the medical condition requiring treatment (e.g., Cardiac Surgery, Kidney Transplant)"
+                  : "Describe the course or program the student wants to pursue (e.g., Bachelor of Engineering - Computer Science, Master of Business Administration)"}
+                rows={caseType === 'university' ? 3 : 2}
               />
+              {caseType === 'university' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Include degree level (Bachelor/Master), field of study, and any specific specialization
+                </p>
+              )}
             </div>
             {clientMode === 'new' && (
               <>

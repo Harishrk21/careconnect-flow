@@ -28,7 +28,7 @@ import ActivityTimeline from '@/components/cases/ActivityTimeline';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const { cases, hospitals, users, getStats, isLoading } = useData();
+  const { cases, hospitals, universities, users, getStats, isLoading } = useData();
 
   const stats = getStats();
 
@@ -39,13 +39,33 @@ const Dashboard: React.FC = () => {
       case 'admin':
         return cases;
       case 'agent':
-        return cases.filter(c => c.agentId === user.id);
+        // Filter by agent ID and agent type (hospital or university)
+        return cases.filter(c => {
+          if (c.agentId !== user.id) return false;
+          // If agent has agentType, filter cases by type
+          if (user.agentType === 'hospital') {
+            return !c.assignedUniversity; // Hospital agents only see hospital cases
+          } else if (user.agentType === 'university') {
+            return !!c.assignedUniversity; // University agents only see university cases
+          }
+          // If no agentType set (legacy), show all cases
+          return true;
+        });
       case 'client':
         return cases.filter(c => c.clientId === user.id);
       case 'hospital':
+        // Hospital users should only see hospital cases (not university cases)
         return cases.filter(c => 
           c.assignedHospital && 
+          !c.assignedUniversity && // Exclude university cases
           (user.hospitalIds || []).includes(c.assignedHospital)
+        );
+      case 'university':
+        // University users should only see university cases (not hospital cases)
+        return cases.filter(c => 
+          c.assignedUniversity && 
+          !c.assignedHospital && // Exclude hospital cases
+          (user.universityIds || []).includes(c.assignedUniversity)
         );
       case 'finance':
         return cases.filter(c => 
@@ -63,7 +83,7 @@ const Dashboard: React.FC = () => {
 
   const pendingActionCases = userCases.filter(c => {
     if (user?.role === 'admin') {
-      return c.status === 'admin_review';
+      return c.status === 'admin_review' || c.status === 'case_agent_review';
     }
     if (user?.role === 'agent') {
       return c.status === 'new' || c.status === 'case_agent_review';
@@ -71,8 +91,11 @@ const Dashboard: React.FC = () => {
     if (user?.role === 'hospital') {
       return c.status === 'hospital_review' || c.status === 'assigned_to_hospital';
     }
+    if (user?.role === 'university') {
+      return c.status === 'hospital_review' || c.status === 'assigned_to_hospital';
+    }
     if (user?.role === 'finance') {
-      return c.status === 'visa_processing_payments' || c.status === 'credit_payment_upload';
+      return c.status === 'visa_processing_payments' || c.status === 'credit_payment_upload' || c.payments.length > 0;
     }
     return false;
   });
@@ -80,6 +103,18 @@ const Dashboard: React.FC = () => {
   const getStatusBadgeClass = (status: string) => {
     const colorClass = STATUS_COLORS[status as keyof typeof STATUS_COLORS] || 'status-neutral';
     return colorClass;
+  };
+
+  // Helper to get context-aware status labels
+  const getStatusLabel = (status: string, caseItem?: Case): string => {
+    const isUniCase = caseItem ? !!caseItem.assignedUniversity : false;
+    if (status === 'assigned_to_hospital') {
+      return isUniCase ? 'Assigned to University' : 'Assigned to Hospital';
+    }
+    if (status === 'hospital_review') {
+      return isUniCase ? 'University Review' : 'Hospital Review';
+    }
+    return STATUS_LABELS[status as keyof typeof STATUS_LABELS] || status;
   };
 
   const getGreeting = () => {
@@ -269,7 +304,7 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={getStatusBadgeClass(caseItem.status)}>
-                        {STATUS_LABELS[caseItem.status]}
+                        {getStatusLabel(caseItem.status, caseItem)}
                       </Badge>
                       <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                     </div>
@@ -301,6 +336,8 @@ const Dashboard: React.FC = () => {
               {recentCases.length > 0 ? (
                 recentCases.map((caseItem) => {
                   const hospital = hospitals.find(h => h.id === caseItem.assignedHospital);
+                  const university = universities.find(u => u.id === caseItem.assignedUniversity);
+                  const isUniversityCase = !!caseItem.assignedUniversity;
                   return (
                     <Link
                       key={caseItem.id}
@@ -314,13 +351,17 @@ const Dashboard: React.FC = () => {
                         <div>
                           <p className="font-medium text-foreground text-sm">{caseItem.clientInfo.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {hospital ? hospital.name : 'Not assigned'} • {new Date(caseItem.updatedAt).toLocaleDateString()}
+                            {isUniversityCase && university 
+                              ? `${university.name} (University)` 
+                              : hospital 
+                              ? `${hospital.name} (Hospital)` 
+                              : 'Not assigned'} • {new Date(caseItem.updatedAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className={getStatusBadgeClass(caseItem.status)}>
-                          {STATUS_LABELS[caseItem.status]}
+                          {getStatusLabel(caseItem.status, caseItem)}
                         </Badge>
                         <Eye className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
@@ -377,7 +418,7 @@ const Dashboard: React.FC = () => {
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Current Status</p>
                         <Badge variant="outline" className={getStatusBadgeClass(caseItem.status)}>
-                          {STATUS_LABELS[caseItem.status]}
+                          {getStatusLabel(caseItem.status, caseItem)}
                         </Badge>
                       </div>
                       <div>

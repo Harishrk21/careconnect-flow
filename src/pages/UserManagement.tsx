@@ -53,12 +53,12 @@ import {
   Building2,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import type { User, UserRole } from '@/types';
+import type { User, UserRole, AgentType } from '@/types';
 import { cn } from '@/lib/utils';
 
 const UserManagement: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const { users, hospitals, createUser, updateUser, deleteUser, refreshUsers, isLoading } = useData();
+  const { users, hospitals, universities, createUser, updateUser, deleteUser, refreshUsers, isLoading } = useData();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -72,7 +72,9 @@ const UserManagement: React.FC = () => {
     email: '',
     phone: '',
     role: 'agent' as UserRole,
+    agentType: undefined as AgentType | undefined,
     hospitalIds: [] as string[],
+    universityIds: [] as string[],
     password: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,8 +94,22 @@ const UserManagement: React.FC = () => {
         u.email.toLowerCase().includes(searchLower) ||
         u.phone.includes(searchQuery);
       
-      // Role filter
-      const matchesRole = roleFilter === 'all' || u.role === roleFilter;
+      // Role filter - handle agent subtypes
+      let matchesRole = false;
+      if (roleFilter === 'all') {
+        matchesRole = true;
+      } else if (roleFilter === 'agent') {
+        // Show all agents
+        matchesRole = u.role === 'agent';
+      } else if (roleFilter === 'agent_hospital') {
+        // Show only hospital agents
+        matchesRole = u.role === 'agent' && u.agentType === 'hospital';
+      } else if (roleFilter === 'agent_university') {
+        // Show only university agents
+        matchesRole = u.role === 'agent' && u.agentType === 'university';
+      } else {
+        matchesRole = u.role === roleFilter;
+      }
       
       return matchesSearch && matchesRole;
     });
@@ -104,13 +120,23 @@ const UserManagement: React.FC = () => {
     const grouped: Record<string, number> = {
       all: filteredUsers.length,
       agent: 0,
+      agent_hospital: 0,
+      agent_university: 0,
       hospital: 0,
+      university: 0,
       finance: 0,
       admin: 0,
     };
     
     filteredUsers.forEach(u => {
-      if (u.role in grouped) {
+      if (u.role === 'agent') {
+        grouped.agent++;
+        if (u.agentType === 'hospital') {
+          grouped.agent_hospital++;
+        } else if (u.agentType === 'university') {
+          grouped.agent_university++;
+        }
+      } else if (u.role in grouped) {
         grouped[u.role]++;
       }
     });
@@ -125,7 +151,9 @@ const UserManagement: React.FC = () => {
       email: '',
       phone: '',
       role: 'agent',
+      agentType: undefined,
       hospitalIds: [] as string[],
+      universityIds: [] as string[],
       password: '',
     });
     setSelectedUser(null);
@@ -145,6 +173,25 @@ const UserManagement: React.FC = () => {
       toast({
         title: 'Validation Error',
         description: 'Please select at least one hospital for hospital agents',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (formData.role === 'university' && formData.universityIds.length === 0) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select at least one university for university agents',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Validate agent type for agents
+    if (formData.role === 'agent' && !formData.agentType) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select agent type (Hospital or University)',
         variant: 'destructive',
       });
       return;
@@ -174,7 +221,9 @@ const UserManagement: React.FC = () => {
         createdBy: currentUser?.id || 'system',
         createdAt: new Date().toISOString(),
         lastLogin: '',
+        agentType: formData.role === 'agent' ? formData.agentType : undefined,
         hospitalIds: formData.role === 'hospital' ? formData.hospitalIds : undefined,
+        universityIds: formData.role === 'university' ? formData.universityIds : undefined,
       });
       
       // Only show success if user was actually created
@@ -211,7 +260,9 @@ const UserManagement: React.FC = () => {
       email: user.email,
       phone: user.phone,
       role: user.role,
+      agentType: user.agentType,
       hospitalIds: user.hospitalIds || [],
+      universityIds: user.universityIds || [],
       password: '', // Don't pre-fill password
     });
     setIsEditDialogOpen(true);
@@ -244,13 +295,26 @@ const UserManagement: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      // Validate agent type for agents
+      if (formData.role === 'agent' && !formData.agentType) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please select agent type (Hospital or University)',
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const updates: Partial<User> = {
         username: formData.username.toLowerCase(),
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
         role: formData.role,
+        agentType: formData.role === 'agent' ? formData.agentType : undefined,
         hospitalIds: formData.role === 'hospital' ? formData.hospitalIds : undefined,
+        universityIds: formData.role === 'university' ? formData.universityIds : undefined,
       };
 
       // Only update password if provided
@@ -311,6 +375,7 @@ const UserManagement: React.FC = () => {
       admin: 'bg-medical-urgent/20 text-medical-urgent',
       agent: 'bg-primary/20 text-primary',
       hospital: 'bg-secondary/20 text-secondary',
+      university: 'bg-medical-info/20 text-medical-info',
       finance: 'bg-medical-warning/20 text-medical-warning',
       client: 'bg-medical-safe/20 text-medical-safe',
     };
@@ -352,7 +417,7 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card className="card-elevated">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -369,10 +434,21 @@ const UserManagement: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Agents</p>
-                <p className="text-3xl font-bold text-foreground mt-1">{usersByRole.agent}</p>
+                <p className="text-sm text-muted-foreground">Hospital Agents</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{usersByRole.agent_hospital}</p>
               </div>
               <Shield className="w-8 h-8 text-primary opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">University Agents</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{usersByRole.agent_university}</p>
+              </div>
+              <Shield className="w-8 h-8 text-medical-info opacity-50" />
             </div>
           </CardContent>
         </Card>
@@ -381,10 +457,22 @@ const UserManagement: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Hospital Agents</p>
+                <p className="text-sm text-muted-foreground">Hospital Users</p>
                 <p className="text-3xl font-bold text-foreground mt-1">{usersByRole.hospital}</p>
               </div>
               <Building2 className="w-8 h-8 text-secondary opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-elevated">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">University Users</p>
+                <p className="text-3xl font-bold text-foreground mt-1">{usersByRole.university}</p>
+              </div>
+              <Building2 className="w-8 h-8 text-medical-info opacity-50" />
             </div>
           </CardContent>
         </Card>
@@ -423,9 +511,11 @@ const UserManagement: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="agent">Agent</SelectItem>
-                <SelectItem value="hospital">Hospital Agent (Sudaind)</SelectItem>
+                <SelectItem value="agent">All Agents</SelectItem>
+                <SelectItem value="agent_hospital">Hospital Agents</SelectItem>
+                <SelectItem value="agent_university">University Agents</SelectItem>
+                <SelectItem value="hospital">Hospital Users</SelectItem>
+                <SelectItem value="university">University Users</SelectItem>
                 <SelectItem value="finance">Finance</SelectItem>
               </SelectContent>
             </Select>
@@ -564,11 +654,38 @@ const UserManagement: React.FC = () => {
                   <SelectContent>
                     <SelectItem value="agent">Agent</SelectItem>
                     <SelectItem value="hospital">Hospital</SelectItem>
+                    <SelectItem value="university">University</SelectItem>
                     <SelectItem value="finance">Finance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {formData.role === 'agent' && (
+              <div className="space-y-2">
+                <Label htmlFor="create-agent-type">Agent Type *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select whether this agent handles hospital or university cases
+                </p>
+                <Select
+                  value={formData.agentType || ''}
+                  onValueChange={(value) => setFormData({ ...formData, agentType: value as AgentType })}
+                >
+                  <SelectTrigger id="create-agent-type">
+                    <SelectValue placeholder="Select agent type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hospital">Hospital Agent</SelectItem>
+                    <SelectItem value="university">University Agent</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!formData.agentType && (
+                  <p className="text-xs text-medical-warning mt-1">
+                    Please select agent type
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="create-name">Full Name *</Label>
@@ -638,6 +755,42 @@ const UserManagement: React.FC = () => {
               </div>
             )}
 
+            {formData.role === 'university' && (
+              <div className="space-y-2">
+                <Label htmlFor="create-university">Assign to University Location(s) *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select one or more universities this agent will handle
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {universities.map((u) => (
+                    <div key={u.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`create-university-${u.id}`}
+                        checked={formData.universityIds.includes(u.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, universityIds: [...formData.universityIds, u.id] });
+                          } else {
+                            setFormData({ ...formData, universityIds: formData.universityIds.filter(id => id !== u.id) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <label htmlFor={`create-university-${u.id}`} className="text-sm cursor-pointer flex-1">
+                        {u.name} - {u.city}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.universityIds.length === 0 && (
+                  <p className="text-xs text-medical-warning mt-1">
+                    Please select at least one university
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="create-password">Initial Password *</Label>
               <Input
@@ -698,11 +851,38 @@ const UserManagement: React.FC = () => {
                   <SelectContent>
                     <SelectItem value="agent">Agent</SelectItem>
                     <SelectItem value="hospital">Hospital</SelectItem>
+                    <SelectItem value="university">University</SelectItem>
                     <SelectItem value="finance">Finance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {formData.role === 'agent' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-agent-type">Agent Type *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select whether this agent handles hospital or university cases
+                </p>
+                <Select
+                  value={formData.agentType || ''}
+                  onValueChange={(value) => setFormData({ ...formData, agentType: value as AgentType })}
+                >
+                  <SelectTrigger id="edit-agent-type">
+                    <SelectValue placeholder="Select agent type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hospital">Hospital Agent</SelectItem>
+                    <SelectItem value="university">University Agent</SelectItem>
+                  </SelectContent>
+                </Select>
+                {!formData.agentType && (
+                  <p className="text-xs text-medical-warning mt-1">
+                    Please select agent type
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-name">Full Name *</Label>
@@ -764,6 +944,42 @@ const UserManagement: React.FC = () => {
                 {formData.hospitalIds.length === 0 && (
                   <p className="text-xs text-medical-warning mt-1">
                     Please select at least one hospital
+                  </p>
+                )}
+              </div>
+            )}
+
+            {formData.role === 'university' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-university">Assign to University Location(s) *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select one or more universities this agent will handle
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {universities.map((u) => (
+                    <div key={u.id} className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id={`edit-university-${u.id}`}
+                        checked={formData.universityIds.includes(u.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFormData({ ...formData, universityIds: [...formData.universityIds, u.id] });
+                          } else {
+                            setFormData({ ...formData, universityIds: formData.universityIds.filter(id => id !== u.id) });
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-border"
+                      />
+                      <label htmlFor={`edit-university-${u.id}`} className="text-sm cursor-pointer flex-1">
+                        {u.name} - {u.city}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                {formData.universityIds.length === 0 && (
+                  <p className="text-xs text-medical-warning mt-1">
+                    Please select at least one university
                   </p>
                 )}
               </div>

@@ -183,9 +183,11 @@ const HospitalManagement: React.FC = () => {
       resetForm();
       await refreshHospitals();
     } catch (error) {
+      console.error('Error creating hospital:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create hospital';
       toast({
         title: 'Error',
-        description: 'Failed to create hospital',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -260,9 +262,11 @@ const HospitalManagement: React.FC = () => {
       resetForm();
       await refreshHospitals();
     } catch (error) {
+      console.error('Error updating hospital:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update hospital';
       toast({
         title: 'Error',
-        description: 'Failed to update hospital',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

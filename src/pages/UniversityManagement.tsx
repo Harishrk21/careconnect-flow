@@ -162,9 +162,11 @@ const UniversityManagement: React.FC = () => {
       resetForm();
       await refreshUniversities();
     } catch (error) {
+      console.error('Error creating university:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create university';
       toast({
         title: 'Error',
-        description: 'Failed to create university',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -226,9 +228,11 @@ const UniversityManagement: React.FC = () => {
       resetForm();
       await refreshUniversities();
     } catch (error) {
+      console.error('Error updating university:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update university';
       toast({
         title: 'Error',
-        description: 'Failed to update university',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

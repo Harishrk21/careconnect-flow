@@ -999,13 +999,13 @@ export const addFinanceCases = async (): Promise<void> => {
         },
       ],
       clientInfo: {
-        name: client.name,
+        name: client.name || 'Patient Name',
         dob: '1985-05-15',
         passport: `SD${1234567 + i}`,
         nationality: 'Sudanese',
-        condition: conditions[i % conditions.length],
-        phone: client.phone,
-        email: client.email,
+        condition: conditions[i % conditions.length] || 'Medical Treatment Required',
+        phone: client.phone || '+249-918-123-456',
+        email: client.email || 'patient@email.com',
         address: 'Khartoum, Sudan',
         emergencyContact: 'Family Member',
         emergencyPhone: '+249-918-999-999',
@@ -1081,6 +1081,29 @@ export const addFinanceCases = async (): Promise<void> => {
       ...log,
       caseId: caseData.id,
     }));
+    
+    // Ensure clientInfo is complete and valid before saving
+    if (!caseData.clientInfo || !caseData.clientInfo.condition || caseData.clientInfo.condition.trim() === '') {
+      console.warn(`Finance case ${caseData.id} missing condition, using default`);
+      caseData.clientInfo = {
+        ...caseData.clientInfo,
+        name: caseData.clientInfo?.name || client.name || 'Patient Name',
+        condition: caseData.clientInfo?.condition || conditions[i % conditions.length] || 'Medical Treatment Required',
+        dob: caseData.clientInfo?.dob || '1985-05-15',
+        passport: caseData.clientInfo?.passport || `SD${1234567 + i}`,
+        nationality: caseData.clientInfo?.nationality || 'Sudanese',
+        phone: caseData.clientInfo?.phone || client.phone || '+249-918-123-456',
+        email: caseData.clientInfo?.email || client.email || 'patient@email.com',
+        address: caseData.clientInfo?.address || 'Khartoum, Sudan',
+        emergencyContact: caseData.clientInfo?.emergencyContact || 'Family Member',
+        emergencyPhone: caseData.clientInfo?.emergencyPhone || '+249-918-999-999',
+      };
+    }
+    
+    // Ensure agentId is set
+    if (!caseData.agentId) {
+      caseData.agentId = agentId;
+    }
     
     await addCase(caseData);
   }
@@ -1367,25 +1390,50 @@ export const addUniversityCasesIfMissing = async (): Promise<void> => {
       if (client && seedClientIndex >= 0) {
         const seedClient = seedClients[seedClientIndex];
         caseData.clientInfo = {
-          name: seedClient.name,
+          name: seedClient.name || client.name || 'Student Name',
           dob: '2000-05-15',
           passport: `SD${2234567 + i}`,
           nationality: 'Sudanese',
-          condition: caseData.clientInfo?.condition || 'Bachelor of Engineering - Computer Science',
-          phone: seedClient.phone,
-          email: seedClient.email,
+          condition: (caseData.clientInfo?.condition && caseData.clientInfo.condition.trim()) || 'Bachelor of Engineering - Computer Science',
+          phone: seedClient.phone || client.phone || '+249-918-123-456',
+          email: seedClient.email || client.email || 'student@email.com',
           address: 'Khartoum, Sudan',
           emergencyContact: 'Family Member',
           emergencyPhone: '+249-918-999-999',
         };
       } else if (client) {
-        // Fallback if seedClient not found
+        // Fallback if seedClient not found - ensure all required fields
         caseData.clientInfo = {
-          ...caseData.clientInfo,
-          name: client.name,
-          email: client.email,
-          phone: client.phone,
+          name: client.name || 'Student Name',
+          dob: caseData.clientInfo?.dob || '2000-05-15',
+          passport: caseData.clientInfo?.passport || `SD${2234567 + i}`,
+          nationality: caseData.clientInfo?.nationality || 'Sudanese',
+          condition: (caseData.clientInfo?.condition && caseData.clientInfo.condition.trim()) || 'Bachelor of Engineering - Computer Science',
+          phone: client.phone || '+249-918-123-456',
+          email: client.email || 'student@email.com',
+          address: caseData.clientInfo?.address || 'Khartoum, Sudan',
+          emergencyContact: caseData.clientInfo?.emergencyContact || 'Family Member',
+          emergencyPhone: caseData.clientInfo?.emergencyPhone || '+249-918-999-999',
         };
+      } else {
+        // Last resort fallback
+        caseData.clientInfo = {
+          name: 'Student Name',
+          dob: '2000-05-15',
+          passport: `SD${2234567 + i}`,
+          nationality: 'Sudanese',
+          condition: (caseData.clientInfo?.condition && caseData.clientInfo.condition.trim()) || 'Bachelor of Engineering - Computer Science',
+          phone: '+249-918-123-456',
+          email: 'student@email.com',
+          address: 'Khartoum, Sudan',
+          emergencyContact: 'Family Member',
+          emergencyPhone: '+249-918-999-999',
+        };
+      }
+      
+      // Ensure condition is not empty
+      if (!caseData.clientInfo.condition || caseData.clientInfo.condition.trim() === '') {
+        caseData.clientInfo.condition = 'Bachelor of Engineering - Computer Science';
       }
       
       // Update activity log case IDs
@@ -1484,17 +1532,36 @@ export const forceCreateUniversityCases = async (): Promise<void> => {
       const seedClient = seedClients.find(sc => sc.username === client.username);
       if (seedClient) {
         caseData.clientInfo = {
-          name: seedClient.name,
+          name: seedClient.name || client.name || 'Student Name',
           dob: '2000-05-15',
           passport: `SD${2234567 + i}`,
           nationality: 'Sudanese',
-          condition: caseData.clientInfo?.condition || 'Bachelor of Engineering - Computer Science',
-          phone: seedClient.phone,
-          email: seedClient.email,
+          condition: (caseData.clientInfo?.condition && caseData.clientInfo.condition.trim()) || 'Bachelor of Engineering - Computer Science',
+          phone: seedClient.phone || client.phone || '+249-918-123-456',
+          email: seedClient.email || client.email || 'student@email.com',
           address: 'Khartoum, Sudan',
           emergencyContact: 'Family Member',
           emergencyPhone: '+249-918-999-999',
         };
+      } else {
+        // Fallback if seedClient not found
+        caseData.clientInfo = {
+          name: client.name || 'Student Name',
+          dob: caseData.clientInfo?.dob || '2000-05-15',
+          passport: caseData.clientInfo?.passport || `SD${2234567 + i}`,
+          nationality: caseData.clientInfo?.nationality || 'Sudanese',
+          condition: (caseData.clientInfo?.condition && caseData.clientInfo.condition.trim()) || 'Bachelor of Engineering - Computer Science',
+          phone: client.phone || '+249-918-123-456',
+          email: client.email || 'student@email.com',
+          address: caseData.clientInfo?.address || 'Khartoum, Sudan',
+          emergencyContact: caseData.clientInfo?.emergencyContact || 'Family Member',
+          emergencyPhone: caseData.clientInfo?.emergencyPhone || '+249-918-999-999',
+        };
+      }
+      
+      // Ensure condition is not empty
+      if (!caseData.clientInfo.condition || caseData.clientInfo.condition.trim() === '') {
+        caseData.clientInfo.condition = 'Bachelor of Engineering - Computer Science';
       }
       
       if (caseData.activityLog) {
@@ -1830,6 +1897,29 @@ export const initializeSeedData = async (): Promise<void> => {
       }
     }
 
+    // Ensure clientInfo is complete and valid
+    if (!caseData.clientInfo || !caseData.clientInfo.condition || caseData.clientInfo.condition.trim() === '') {
+      console.warn(`Case ${caseId} missing condition, using default`);
+      caseData.clientInfo = {
+        ...caseData.clientInfo,
+        name: caseData.clientInfo?.name || 'Patient Name',
+        condition: caseData.clientInfo?.condition || 'Medical Treatment Required',
+        dob: caseData.clientInfo?.dob || '1985-05-15',
+        passport: caseData.clientInfo?.passport || `SD${1234567 + i}`,
+        nationality: caseData.clientInfo?.nationality || 'Sudanese',
+        phone: caseData.clientInfo?.phone || '+249-918-123-456',
+        email: caseData.clientInfo?.email || 'patient@email.com',
+        address: caseData.clientInfo?.address || 'Khartoum, Sudan',
+        emergencyContact: caseData.clientInfo?.emergencyContact || 'Family Member',
+        emergencyPhone: caseData.clientInfo?.emergencyPhone || '+249-918-999-999',
+      };
+    }
+    
+    // Ensure agentId is set
+    if (!caseData.agentId) {
+      caseData.agentId = hospitalAgentIds[i % hospitalAgentIds.length];
+    }
+    
     await addCase({
       id: caseId,
       ...caseData,
@@ -1871,6 +1961,29 @@ export const initializeSeedData = async (): Promise<void> => {
         ...log,
         caseId: caseData.id,
       }));
+    }
+    
+    // Ensure clientInfo is complete and valid before saving
+    if (!caseData.clientInfo || !caseData.clientInfo.condition || caseData.clientInfo.condition.trim() === '') {
+      console.warn(`University case ${caseId} missing condition, using default`);
+      caseData.clientInfo = {
+        ...caseData.clientInfo,
+        name: caseData.clientInfo?.name || 'Student Name',
+        condition: caseData.clientInfo?.condition || 'Bachelor of Engineering - Computer Science',
+        dob: caseData.clientInfo?.dob || '2000-05-15',
+        passport: caseData.clientInfo?.passport || `SD${2234567 + i}`,
+        nationality: caseData.clientInfo?.nationality || 'Sudanese',
+        phone: caseData.clientInfo?.phone || '+249-918-123-456',
+        email: caseData.clientInfo?.email || 'student@email.com',
+        address: caseData.clientInfo?.address || 'Khartoum, Sudan',
+        emergencyContact: caseData.clientInfo?.emergencyContact || 'Family Member',
+        emergencyPhone: caseData.clientInfo?.emergencyPhone || '+249-918-999-999',
+      };
+    }
+    
+    // Ensure agentId is set
+    if (!caseData.agentId) {
+      caseData.agentId = universityAgentIds[i % universityAgentIds.length];
     }
     
     await addCase(caseData);

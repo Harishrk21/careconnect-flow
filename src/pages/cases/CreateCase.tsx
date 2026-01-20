@@ -150,7 +150,13 @@ const CreateCase: React.FC = () => {
       });
       navigate('/cases');
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to create case', variant: 'destructive' });
+      console.error('Error creating case:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create case';
+      toast({ 
+        title: 'Error', 
+        description: errorMessage, 
+        variant: 'destructive' 
+      });
     } finally { 
       setLoading(false); 
     }

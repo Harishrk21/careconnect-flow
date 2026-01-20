@@ -17,6 +17,7 @@ import {
   deleteUniversity as deleteUniversityStorage,
   getAllUsers,
   getUserById,
+  getUserByUsername,
   addUser,
   updateUser as updateUserStorage,
   deleteUser as deleteUserStorage,
@@ -150,42 +151,44 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const createCase = async (caseData: Partial<Case>): Promise<Case> => {
+    // Validate required fields
+    if (!caseData.clientId || caseData.clientId.trim() === '') {
+      throw new Error('Client ID is required to create a case');
+    }
+    if (!caseData.clientInfo || !caseData.clientInfo.condition || caseData.clientInfo.condition.trim() === '') {
+      throw new Error('Medical condition or course/program is required');
+    }
+    if (!user?.id) {
+      throw new Error('User must be logged in to create a case');
+    }
+
     await simulateDelay(600);
     const newCase: Case = {
       id: generateId('case'),
-      clientId: caseData.clientId || '',
-      agentId: user?.id || '',
+      clientId: caseData.clientId,
+      agentId: user.id,
       status: 'new',
       statusHistory: [{
         status: 'new',
         timestamp: new Date().toISOString(),
-        by: user?.id || '',
-        byName: user?.name || '',
+        by: user.id,
+        byName: user.name || '',
         note: 'Case created',
       }],
       documents: [],
-      clientInfo: caseData.clientInfo || {
-        name: '',
-        dob: '',
-        passport: '',
-        nationality: '',
-        condition: '',
-        phone: '',
-        email: '',
-        address: '',
-        emergencyContact: '',
-        emergencyPhone: '',
-      },
+      clientInfo: caseData.clientInfo,
       attenderInfo: caseData.attenderInfo,
+      assignedHospital: caseData.assignedHospital,
+      assignedUniversity: caseData.assignedUniversity,
       payments: [],
       visa: { status: 'not_started' },
       comments: [],
       activityLog: [{
         id: generateId('log'),
         caseId: '',
-        userId: user?.id || '',
-        userName: user?.name || '',
-        userRole: user?.role || 'agent',
+        userId: user.id,
+        userName: user.name || '',
+        userRole: user.role || 'agent',
         action: 'Case Created',
         details: `New case created for ${caseData.clientInfo?.name || 'patient'}`,
         timestamp: new Date().toISOString(),
@@ -196,8 +199,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     newCase.activityLog[0].caseId = newCase.id;
-    await addCase(newCase);
-    await refreshCases();
+    try {
+      await addCase(newCase);
+      await refreshCases();
+    } catch (error) {
+      console.error('Error saving case to database:', error);
+      throw new Error(`Failed to save case: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
     return newCase;
   };
 
@@ -614,9 +622,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const createUser = async (userData: Omit<User, 'id'>): Promise<User> => {
     await simulateDelay(500);
     // Normalize username to lowercase and trim for consistency
+    const normalizedUsername = userData.username.toLowerCase().trim();
+    
+    // Check if username already exists
+    const existingUser = await getUserByUsername(normalizedUsername);
+    if (existingUser) {
+      throw new Error(`Username "${normalizedUsername}" already exists. Please use a different username.`);
+    }
+    
     const newUser: User = {
       ...userData,
-      username: userData.username.toLowerCase().trim(),
+      username: normalizedUsername,
       id: generateId(userData.role),
     };
     
@@ -630,22 +646,32 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       passwordChanged: newUser.passwordChanged,
     });
     
-    await addUser(newUser);
-    const usersData = await getAllUsers();
-    setUsers(usersData);
-    
-    // Verify user was created correctly
-    const createdUser = await getUserByUsername(newUser.username);
-    if (createdUser) {
-      console.log('User created successfully:', {
-        id: createdUser.id,
-        username: createdUser.username,
-        passwordLength: createdUser.password?.length,
-        passwordDecoded: createdUser.password ? atob(createdUser.password) : 'N/A',
-      });
+    try {
+      await addUser(newUser);
+      const usersData = await getAllUsers();
+      setUsers(usersData);
+      
+      // Verify user was created correctly
+      const createdUser = await getUserByUsername(newUser.username);
+      if (createdUser) {
+        console.log('User created successfully:', {
+          id: createdUser.id,
+          username: createdUser.username,
+          passwordLength: createdUser.password?.length,
+          passwordDecoded: createdUser.password ? atob(createdUser.password) : 'N/A',
+        });
+      } else {
+        throw new Error('User was not created successfully. Please try again.');
+      }
+      
+      return newUser;
+    } catch (error) {
+      console.error('Error creating user:', error);
+      if (error instanceof Error && error.message.includes('already exists')) {
+        throw error;
+      }
+      throw new Error(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    return newUser;
   };
 
   const updateUser = async (userId: string, userData: Partial<User>): Promise<void> => {
